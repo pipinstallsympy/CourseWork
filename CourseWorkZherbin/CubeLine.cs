@@ -42,28 +42,28 @@ public class CubeLine
         }
     }
 
-    public void GeneratePoresByPersent(double persent)
+    public void GeneratePoresByPercent(double percent)
     {
-        if (persent < 0 || persent >= 100)
+        if (percent < 0 || percent >= 100)
         {
             throw new ArgumentException();
         }
         
         int poreCount = 0;
-        double porePersent = 0;
+        double porePercent = 0;
         int randIndex;
         int len = Line.Count;
         Random rand = new Random();
 
 
-        while(porePersent < persent)
+        while(porePercent < percent)
         {
             randIndex = rand.Next(len);
             if (this.Line[randIndex].IsEmpty == false)
             {
                 this.Line[randIndex].IsEmpty = true;
                 poreCount++;
-                porePersent = poreCount /len * 100;
+                porePercent = (double)poreCount / len * 100;
             }
         }
         
