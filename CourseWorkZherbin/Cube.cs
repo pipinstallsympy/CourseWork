@@ -2,9 +2,9 @@
 
 public class Cube: Figure
 {
-    private Point CentralPoint;
-    private double SideLength;
-    private double HalfDiagLength;
+    public Point CentralPoint;
+    public double SideLength;
+    public double HalfDiagLength;
 
     public Cube(Point centralPoint, double sideLength)
     {

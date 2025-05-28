@@ -1,26 +1,24 @@
-﻿using System.Runtime.CompilerServices;
-[assembly: InternalsVisibleTo("TestCourseWork")]
-namespace CourseWorkZherbin;
+﻿namespace CourseWorkZherbin;
 
 
 public class Point
 {
-    protected double x;
-    protected double y;
-    protected double z;
+    public double X;
+    public double Y;
+    public double Z;
 
     public Point(double x = 0, double y = 0, double z = 0)
     {
-        this.x = x;
-        this.y = y;
-        this.z = z;
+        this.X = x;
+        this.Y = y;
+        this.Z = z;
     }
     
     public static Point operator +(Point a, Point b) =>
-        new Point(a.x + b.x, a.y + b.y, a.z + b.z);
+        new Point(a.X + b.X, a.Y + b.Y, a.Z + b.Z);
         
     public static Point operator -(Point a, Point b) =>
-        new Point(a.x - b.x, a.y - b.y, a.z - b.z);
+        new Point(a.X - b.X, a.Y - b.Y, a.Z - b.Z);
     
-    public double DistanceBetweenPoint( Point p ) => Math.Sqrt(Math.Pow(p.x - this.x, 2) + Math.Pow(p.y - this.y, 2) + Math.Pow(p.z - this.z, 2));
+    public double DistanceBetweenPoint( Point p ) => Math.Sqrt(Math.Pow(p.X - this.X, 2) + Math.Pow(p.Y - this.Y, 2) + Math.Pow(p.Z - this.Z, 2));
 }
