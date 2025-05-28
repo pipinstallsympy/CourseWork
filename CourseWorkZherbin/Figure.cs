@@ -2,5 +2,5 @@
 
 public abstract class Figure
 {
-    protected bool IsEmpty = false;
+    public bool IsEmpty = false;
 }
