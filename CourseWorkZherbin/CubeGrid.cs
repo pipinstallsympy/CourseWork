@@ -4,6 +4,10 @@ public class CubeGrid
 {
     public List<List<List<Cube>>> Grid;
 
+    public CubeGrid()
+    {
+        Grid = new List<List<List<Cube>>>();
+    }
     public CubeGrid(int partition)
     {
         Grid = new List<List<List<Cube>>>();
@@ -125,6 +129,25 @@ public class CubeGrid
                 }
             }
         }
+    }
+
+    public CubeLine GenerateLineFromGrid()
+    {
+        CubeLine line = new CubeLine();
+        
+        int len = Grid.Count;
+        for (int i = 0; i < len; i++)
+        {
+            for (int j = 0; j < len; j++)
+            {
+                for (int k = 0; k < len; k++)
+                {
+                    line.Line[i * len + j * len + k * len] = Grid[i][j][k];
+                }
+            }
+        }
+        
+        return line;
     }
 
     int Sgn(int value)

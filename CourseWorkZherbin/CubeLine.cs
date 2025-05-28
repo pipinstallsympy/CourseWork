@@ -4,6 +4,10 @@ public class CubeLine
 {
     public List<Cube> Line;
 
+    public CubeLine()
+    {
+        Line = new List<Cube>();
+    }
     public CubeLine(CubeGrid grid)
     {
         Line = new List<Cube>();
@@ -20,9 +24,28 @@ public class CubeLine
         }
     }
 
+    public CubeGrid GenerateGridFromLine()
+    {
+        CubeGrid grid = new CubeGrid();
+        int len = (int)Math.Pow(this.Line.Count, 1/3);
+
+        for (int i = 0; i < len; i++)
+        {
+            for (int j = 0; j < len; j++)
+            {
+                for (int k = 0; k < len; k++)
+                {
+                    grid.Grid[i][j][k] = this.Line[i * len + j * len + k * len];
+                }
+            }
+        }
+
+        return grid;
+    }
+
     public void GeneratePoresByCount(int poreAmount)
     {
-        int poreCount = 0;
+        int poreCount = this.PoreAmount();
         int randIndex;
         int len = Line.Count;
         Random rand = new Random();
@@ -49,10 +72,10 @@ public class CubeLine
             throw new ArgumentException();
         }
         
-        int poreCount = 0;
-        double porePercent = 0;
         int randIndex;
         int len = Line.Count;
+        int poreCount = this.PoreAmount();
+        double porePercent = (double)poreCount / len;
         Random rand = new Random();
 
 
@@ -66,6 +89,15 @@ public class CubeLine
                 porePercent = (double)poreCount / len * 100;
             }
         }
-        
+    }
+
+    public int PoreAmount()
+    {
+        int count = 0;
+        foreach (Cube c in Line)
+        {
+            if (c.IsEmpty == true) count++;
+        }
+        return count;
     }
 }
