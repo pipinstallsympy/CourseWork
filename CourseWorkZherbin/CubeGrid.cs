@@ -1,4 +1,5 @@
-﻿namespace CourseWorkZherbin;
+﻿using System.Collections.Generic;
+namespace CourseWorkZherbin;
 
 public class CubeGrid
 {
@@ -10,17 +11,19 @@ public class CubeGrid
     }
     public CubeGrid(int partition)
     {
-        Grid = new List<List<List<Cube>>>();
+        Grid = new List<List<List<Cube>>>(partition);
         double step = 1.0 / partition;
         double halfStep = step * 0.5;
         
         for (int i = 0; i < partition; i++)
         {
+            Grid.Add(new List<List<Cube>>(partition));
             for (int j = 0; j < partition; j++)
             {
+                Grid[i].Add(new List<Cube>(partition));
                 for (int k = 0; k < partition; k++)
                 {
-                    Grid[i][j][k] = new Cube(new Point(halfStep + i * step,halfStep + j * step,halfStep + k * step), step);
+                    Grid[i][j].Add(new Cube(new Point(halfStep + i * step,halfStep + j * step,halfStep + k * step), step));
                 }
             }
         }
@@ -135,6 +138,7 @@ public class CubeGrid
     {
         CubeLine line = new CubeLine();
         
+        
         int len = Grid.Count;
         for (int i = 0; i < len; i++)
         {
@@ -142,7 +146,7 @@ public class CubeGrid
             {
                 for (int k = 0; k < len; k++)
                 {
-                    line.Line[i * len + j * len + k * len] = Grid[i][j][k];
+                    line.Line.Add(Grid[i][j][k]);
                 }
             }
         }

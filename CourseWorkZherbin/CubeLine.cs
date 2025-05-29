@@ -27,15 +27,19 @@ public class CubeLine
     public CubeGrid GenerateGridFromLine()
     {
         CubeGrid grid = new CubeGrid();
-        int len = (int)Math.Pow(this.Line.Count, 1/3);
+        int len = (int)Math.Pow(this.Line.Count, 1.0/3);
+        grid.Grid = new List<List<List<Cube>>>(len);
+        
 
         for (int i = 0; i < len; i++)
         {
+            grid.Grid.Add(new List<List<Cube>>(len));
             for (int j = 0; j < len; j++)
             {
+                grid.Grid[i].Add(new List<Cube>(len));
                 for (int k = 0; k < len; k++)
                 {
-                    grid.Grid[i][j][k] = this.Line[i * len + j * len + k * len];
+                    grid.Grid[i][j].Add(Line[i * len + j * len + k]);
                 }
             }
         }
