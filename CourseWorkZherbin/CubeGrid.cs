@@ -38,12 +38,12 @@ public class CubeGrid
     {
         if (partition <= 0)
         {
-            throw new ArgumentException("Partition must be greater than zero");
+            throw new ArgumentException("Кол-во разделений должно быть больше нуля");
         }
 
         if (startCube == null)
         {
-            throw new ArgumentNullException("startCube is null");
+            throw new ArgumentException("Куб обладает null значением");
         }
         
         double step = startCube.SideLength / partition;
@@ -87,12 +87,12 @@ public class CubeGrid
     {
         if (partition <= 0)
         {
-            throw new ArgumentException("Partition must be greater than zero");
+            throw new ArgumentException("Кол-во разделений должно быть больше нуля");
         }
         
         if (startPoint.X == endPoint.X || startPoint.Y == endPoint.Y || startPoint.Z == endPoint.Z)
         {
-            throw new ArgumentException();
+            throw new ArgumentException("По заданным точкам видео, что это не куб");
         }
 
         double xDist = Math.Abs(startPoint.X - endPoint.X);
@@ -101,9 +101,9 @@ public class CubeGrid
 
         if (xDist != yDist || xDist != zDist)
         {
-            throw new ArgumentException();
+            throw new ArgumentException("По заданным точкам видео, что это не куб");
         }
-        
+
         Grid = new List<List<List<Cube>>>();
         
         
