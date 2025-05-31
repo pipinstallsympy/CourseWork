@@ -52,10 +52,10 @@ public class CubeLine
         int len = Line.Count;
         if (poreAmount < 0 || poreAmount >= len)
         {
-            throw new ArgumentException();
+            throw new ArgumentException("Кол-во пор не может быть меньше 0 и больше кол-во элементов в разбиении");
         }
         
-        int poreCount = this.PoreAmount();
+        int poreCount = PoreAmount();
         int randIndex;
         Random rand = new Random();
 
@@ -63,9 +63,9 @@ public class CubeLine
         while(poreAmount != poreCount)
         {
             randIndex = rand.Next(len);
-            if (this.Line[randIndex].IsEmpty == false)
+            if (Line[randIndex].IsEmpty == false)
             {
-                this.Line[randIndex].IsEmpty = true;
+                Line[randIndex].IsEmpty = true;
                 poreCount++;
             }
         }
@@ -75,7 +75,7 @@ public class CubeLine
     {
         if (percent < 0 || percent >= 100)
         {
-            throw new ArgumentException();
+            throw new ArgumentException("Кол-во процентов принадлежит отрезку [0, 100)");
         }
         
         int randIndex;
