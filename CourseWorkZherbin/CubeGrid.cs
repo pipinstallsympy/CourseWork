@@ -11,6 +11,11 @@ public class CubeGrid
     }
     public CubeGrid(int partition)
     {
+        if (partition <= 0)
+        {
+            throw new ArgumentException("Partition must be greater than zero");
+        }
+        
         Grid = new List<List<List<Cube>>>(partition);
         double step = 1.0 / partition;
         double halfStep = step * 0.5;
@@ -28,18 +33,22 @@ public class CubeGrid
             }
         }
     }
-
+    
     public CubeGrid(Cube startCube, int partition)
     {
-        Grid = new List<List<List<Cube>>>();
+        if (partition <= 0)
+        {
+            throw new ArgumentException("Partition must be greater than zero");
+        }
+
+        if (startCube == null)
+        {
+            throw new ArgumentNullException("startCube is null");
+        }
         
         double step = startCube.SideLength / partition;
-        int end = partition / 2;
-        int start = end * -1;
-        
-        
         double halfStep;
-        
+
         if (partition % 2 == 0)
         {
             halfStep = step * 0.5;
@@ -49,21 +58,26 @@ public class CubeGrid
             halfStep = 0;
         }
         
-
+        Grid = new List<List<List<Cube>>>();
+        int end = partition / 2;
+        int start = end * -1;
+        
         Point p;
         double startX = startCube.CentralPoint.X;
         double startY = startCube.CentralPoint.Y;
         double startZ = startCube.CentralPoint.Z;
         
         
-        for (int i = 0; i < partition / 2; i++)
+        for (int i = 0; i < partition; i++)
         {
+            Grid.Add(new List<List<Cube>>(partition));
             for (int j = 0; j < partition; j++)
             {
+                Grid[i].Add(new List<Cube>(partition));
                 for (int k = 0; k < partition; k++)
                 {
-                    p = new Point(startX + i * step + halfStep * Sgn(i), startY + j * step + halfStep * Sgn(j), startZ + k * step + halfStep * Sgn(k));
-                    Grid[i][j][k] = new Cube(p, step);
+                    p = new Point(startX + (i + start) * step + halfStep * Sgn(i), startY + (j + start) * step + halfStep * Sgn(j), startZ + (k + start) * step + halfStep * Sgn(k));
+                    Grid[i][j].Add(new Cube(p, step));
                 }
             }
         }
@@ -71,6 +85,11 @@ public class CubeGrid
 
     public CubeGrid(Point startPoint, Point endPoint, int partition)
     {
+        if (partition <= 0)
+        {
+            throw new ArgumentException("Partition must be greater than zero");
+        }
+        
         if (startPoint.X == endPoint.X || startPoint.Y == endPoint.Y || startPoint.Z == endPoint.Z)
         {
             throw new ArgumentException();
@@ -94,7 +113,8 @@ public class CubeGrid
             (startPoint, endPoint) = (endPoint, startPoint);
         }
         
-        double step = 1.0 / partition;
+        double newSideLengthHalf = xDist / (2 * Math.Sqrt(2));
+        double step = newSideLengthHalf * 2 / partition;
         double halfStep = step * 0.5;
         double startX = startPoint.X;
         double startY = startPoint.Y;
@@ -103,43 +123,26 @@ public class CubeGrid
 
         for (int i = 0; i < partition; i++)
         {
+            Grid.Add(new List<List<Cube>>(partition));
             for (int j = 0; j < partition; j++)
             {
+                Grid[i].Add(new List<Cube>(partition));
                 for (int k = 0; k < partition; k++)
                 {
-                    p = new Point(startX + halfStep + i * step, startY + halfStep + j * step,
-                        startZ + halfStep + k * step);
-                    Grid[i][j][k] = new Cube(p, step);
+                    p = new Point(startX + halfStep + (i - newSideLengthHalf) * step, startY + halfStep + (j - newSideLengthHalf) * step,
+                        startZ + halfStep + (k - newSideLengthHalf) * step);
+                    Grid[i][j].Add( new Cube(p, step));
                 }
             }
         }
     }
-
-
-    public CubeGrid(CubeLine line)
-    {
-        Grid = new List<List<List<Cube>>>();
-
-        int len = (int)Math.Pow(line.Line.Count, 1/3);
-
-        for (int i = 0; i < len; i++)
-        {
-            for (int j = 0; j < len; j++)
-            {
-                for (int k = 0; k < len; k++)
-                {
-                    Grid[i][j][k] = line.Line[i * len + j * len + k * len];
-                }
-            }
-        }
-    }
+    
 
     public CubeLine GenerateLineFromGrid()
     {
         CubeLine line = new CubeLine();
-        
-        
         int len = Grid.Count;
+        
         for (int i = 0; i < len; i++)
         {
             for (int j = 0; j < len; j++)

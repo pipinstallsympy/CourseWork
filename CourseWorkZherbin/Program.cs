@@ -4,7 +4,7 @@ class Program
 {
     static void Main(string[] args)
     {
-        CubeGrid grid = new CubeGrid(2);
+        CubeGrid grid = new CubeGrid(new Point(), new Point(1, 1, 1),2);
         CubeLine g2 = grid.GenerateLineFromGrid();
         g2.GeneratePoresByCount(5);
         grid = g2.GenerateGridFromLine();
