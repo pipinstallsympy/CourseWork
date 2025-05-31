@@ -4,6 +4,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CourseWorkZherbin", "Course
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestCourseWork", "TestCourseWork\TestCourseWork.csproj", "{840CB51F-2A2C-4B9A-8F9D-DCE63CE640E2}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WPFCourseWork", "WPFCourseWork\WPFCourseWork.csproj", "{806E4B48-FB6C-4A3C-96B1-CE1AC2FCE823}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -18,5 +20,9 @@ Global
 		{840CB51F-2A2C-4B9A-8F9D-DCE63CE640E2}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{840CB51F-2A2C-4B9A-8F9D-DCE63CE640E2}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{840CB51F-2A2C-4B9A-8F9D-DCE63CE640E2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{806E4B48-FB6C-4A3C-96B1-CE1AC2FCE823}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{806E4B48-FB6C-4A3C-96B1-CE1AC2FCE823}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{806E4B48-FB6C-4A3C-96B1-CE1AC2FCE823}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{806E4B48-FB6C-4A3C-96B1-CE1AC2FCE823}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
