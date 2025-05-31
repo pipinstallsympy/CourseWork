@@ -18,7 +18,7 @@ public class CubeLine
             {
                 for (int k = 0; k < len; k++)
                 {
-                    Line[i * len + j * len + k * len] = grid.Grid[i][j][k];
+                    Line.Add(grid.Grid[i][j][k]);
                 }
             }
         }
@@ -39,7 +39,7 @@ public class CubeLine
                 grid.Grid[i].Add(new List<Cube>(len));
                 for (int k = 0; k < len; k++)
                 {
-                    grid.Grid[i][j].Add(Line[i * len + j * len + k]);
+                    grid.Grid[i][j].Add(Line[i * len * len + j * len + k]);
                 }
             }
         }
@@ -49,15 +49,17 @@ public class CubeLine
 
     public void GeneratePoresByCount(int poreAmount)
     {
-        int poreCount = this.PoreAmount();
-        int randIndex;
         int len = Line.Count;
-        Random rand = new Random();
-
         if (poreAmount < 0 || poreAmount >= len)
         {
             throw new ArgumentException();
         }
+        
+        int poreCount = this.PoreAmount();
+        int randIndex;
+        Random rand = new Random();
+
+        
         while(poreAmount != poreCount)
         {
             randIndex = rand.Next(len);
