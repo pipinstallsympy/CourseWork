@@ -3,8 +3,9 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:helix="http://helix-toolkit.org/wpf"
         mc:Ignorable="d"
-        Title="Goyda" Height="540" Width="960" WindowStyle="ThreeDBorderWindow">
+        Title="Course Work Zherbin" Height="540" Width="960" WindowStyle="ThreeDBorderWindow">
     <Grid Name="MainRoot" Background="White">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width = "*"></ColumnDefinition>
@@ -17,15 +18,19 @@
         </Grid.RowDefinitions>
         
         
+        
+        
         <Grid Grid.Row="0" Grid.Column="0" Grid.RowSpan="2" Name="Space3D">
             <Border BorderBrush="Black" BorderThickness="1"></Border>
-            <ListView x:Name = "CalculationsResults">
-                <ListView.View>
-                    <GridView>
-                        <GridViewColumn Header = "Значения" DisplayMemberBinding="{Binding}"></GridViewColumn>
-                    </GridView>
-                </ListView.View>
-            </ListView>
+            <helix:HelixViewport3D x:Name="Viewport">
+                <helix:CoordinateSystemVisual3D />
+                <helix:GridLinesVisual3D 
+                    Width="1000" Length="1000" 
+                    MinorDistance="1" MajorDistance="1"
+                    Thickness="0.01" />
+                <helix:DefaultLights/>
+            </helix:HelixViewport3D>
+                
         </Grid>
         
         
@@ -113,6 +118,7 @@
                 <Rectangle Height="15"/> <!-- Разделитель между элементами -->
 
                 <StackPanel x:Name = "PorePanel" >
+                    <TextBlock>Вид распределение пор:</TextBlock>
                     <RadioButton GroupName="Pores" Content="По количеству" IsChecked="True" />
                     <RadioButton GroupName="Pores" Content="По процентному соотношению" />
                 </StackPanel>
@@ -128,8 +134,17 @@
             </StackPanel>
         </Grid>
         
-        
-        <Button Grid.Column="1" Grid.Row="1" Content = "Начать расчеты"  Click = "OnMethodSelected" Margin="10" Width="120" Height="30" VerticalAlignment="Bottom"></Button>
+        <Button 
+            Grid.Column="1" 
+            Grid.Row="1" 
+            Content = "Начать расчеты"  
+            Click = "OnMethodSelected" 
+            Margin="10" 
+            Width="120" 
+            Height="30" 
+            VerticalAlignment="Bottom">
+            
+        </Button>
 
     </Grid>
 </Window>

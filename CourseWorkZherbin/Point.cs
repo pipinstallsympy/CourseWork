@@ -1,6 +1,4 @@
 ﻿namespace CourseWorkZherbin;
-
-
 public class Point
 {
     public double X;
@@ -41,4 +39,5 @@ public class Point
     
     
     public double DistanceBetweenPoint( Point p ) => Math.Sqrt(Math.Pow(p.X - this.X, 2) + Math.Pow(p.Y - this.Y, 2) + Math.Pow(p.Z - this.Z, 2));
+    
 }

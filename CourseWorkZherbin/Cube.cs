@@ -4,17 +4,13 @@ public class Cube: Figure
 {
     public Point CentralPoint;
     public double SideLength;
-    public double HalfDiagLength;
 
     public Cube(Point centralPoint, double sideLength)
     {
-        if(sideLength <= 0) throw new ArgumentException();
+        if(sideLength <= 0) throw new ArgumentException("Сторона куба должна быть неотрицательной");
         CentralPoint = centralPoint;
         SideLength = sideLength;
-        HalfDiagLength = sideLength * Math.Sqrt(2) / 2;
-        this.IsEmpty = false;
+        IsEmpty = false;
     }
-    
 
-    public double GetDiagonalLength() => HalfDiagLength * 2;
 }

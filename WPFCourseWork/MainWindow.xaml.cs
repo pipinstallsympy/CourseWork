@@ -1,15 +1,26 @@
-﻿using System.Windows;
+﻿using System.Reflection;
+using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 using CourseWorkZherbin;
 using Point = CourseWorkZherbin.Point;
+using HelixToolkit.Wpf;
+using System.Windows.Media.Media3D;
 
 namespace WPFCourseWork;
 
-/// <summary>
-/// Interaction logic for MainWindow.xaml
-/// </summary>
 public partial class MainWindow : Window
 {
+    private static List<BoxVisual3D> cubesVisual = new List<BoxVisual3D>();
+    private static GridLinesVisual3D gridLines = new GridLinesVisual3D()
+    {
+        Width = 1000,     
+        Length = 1000,    
+        MinorDistance = 1,  
+        MajorDistance = 1,  
+        Thickness = 0.01,   
+    };
+    private static CoordinateSystemVisual3D coordinateSystem = new CoordinateSystemVisual3D();
     public MainWindow()
     {
         InitializeComponent();
@@ -81,20 +92,8 @@ public partial class MainWindow : Window
         CubeLine liney = griddy.GenerateLineFromGrid();
         CreatePores(liney, poreChoice, poresValue);
         
-        List<string> output = new List<string>();
+        InitializeCube(liney);
 
-        for (int i = 0; i < partition; i++)
-        {
-            for (int j = 0; j < partition; j++)
-            {
-                for (int k = 0; k < partition; k++)
-                {
-                    output.Add(griddy.Grid[i][j][k].IsEmpty.ToString());
-                }
-            }
-        }
-        
-        CalculationsResults.ItemsSource = output;
         
     }
     
@@ -137,20 +136,8 @@ public partial class MainWindow : Window
         }
         CreatePores(liney, poreChoice, poresValue);
         
-        List<string> output = new List<string>();
+        InitializeCube(liney);
 
-        for (int i = 0; i < partition; i++)
-        {
-            for (int j = 0; j < partition; j++)
-            {
-                for (int k = 0; k < partition; k++)
-                {
-                    output.Add(griddy.Grid[i][j][k].IsEmpty.ToString());
-                }
-            }
-        }
-        
-        CalculationsResults.ItemsSource = output;
     }
     
     private void CalculationsPoints(int partition, string poreChoice, double poresValue)
@@ -190,6 +177,7 @@ public partial class MainWindow : Window
         Point p2 = new Point(p2X, p2Y, p2Z);
         CubeGrid griddy;
         CubeLine liney;
+        
         try
         {
             griddy = new CubeGrid(p1, p2, partition);
@@ -203,20 +191,7 @@ public partial class MainWindow : Window
         
         CreatePores(liney, poreChoice, poresValue);
         
-        List<string> output = new List<string>();
-
-        for (int i = 0; i < partition; i++)
-        {
-            for (int j = 0; j < partition; j++)
-            {
-                for (int k = 0; k < partition; k++)
-                {
-                    output.Add(griddy.Grid[i][j][k].IsEmpty.ToString());
-                }
-            }
-        }
-        
-        CalculationsResults.ItemsSource = output;
+        InitializeCube(liney);
     }
 
     private void CreatePores(CubeLine liney, string poreChoice, double poresValue)
@@ -242,4 +217,54 @@ public partial class MainWindow : Window
         }
     }
 
+
+    private void InitializeCube(CubeLine liney)
+    {
+        Viewport.Children.Clear();
+        Viewport.Children.Add(gridLines);
+        Viewport.Children.Add(coordinateSystem);
+        Viewport.Children.Add(new DefaultLights());
+        
+
+        foreach (Cube c in liney.Line)
+        {
+            if(c.IsEmpty) continue;
+            var cube = new BoxVisual3D()
+            {
+                Center = new Point3D()
+                {
+                    X = c.CentralPoint.X,
+                    Y = c.CentralPoint.Y,
+                    Z = c.CentralPoint.Z
+                },
+                Width = c.SideLength,
+                Height = c.SideLength,
+                Length = c.SideLength,
+                Material = MaterialHelper.CreateMaterial(Colors.Red)
+            };
+            
+            Viewport.Children.Add(cube);
+        }
+        
+    }
+}
+
+public class CubeData
+{
+    public Point3D CenterPoint { get; set; }
+    public double SideLength { get; set; }
+    public Color Color { get; set; }
+
+    public CubeData(Cube c)
+    {
+        CenterPoint = CenterPoint with
+        {
+            X = c.CentralPoint.X,
+            Y = c.CentralPoint.Y,
+            Z = c.CentralPoint.Z
+        };
+        SideLength = c.SideLength;
+        Color = Colors.Red;
+    }
+    
 }
