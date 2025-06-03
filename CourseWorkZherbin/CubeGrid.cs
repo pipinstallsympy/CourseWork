@@ -1,5 +1,4 @@
-﻿using System.Collections.Generic;
-namespace CourseWorkZherbin;
+﻿namespace CourseWorkZherbin;
 
 public class CubeGrid
 {
@@ -19,6 +18,8 @@ public class CubeGrid
         Grid = new List<List<List<Cube>>>(partition);
         double step = 1.0 / partition;
         double halfStep = step * 0.5;
+
+        Point p;
         
         for (int i = 0; i < partition; i++)
         {
@@ -28,7 +29,8 @@ public class CubeGrid
                 Grid[i].Add(new List<Cube>(partition));
                 for (int k = 0; k < partition; k++)
                 {
-                    Grid[i][j].Add(new Cube(new Point(halfStep + i * step,halfStep + j * step,halfStep + k * step), step));
+                    p = new Point(halfStep + i * step, halfStep + j * step, halfStep + k * step);
+                    Grid[i][j].Add(new Cube(p, step));
                 }
             }
         }
@@ -46,13 +48,9 @@ public class CubeGrid
             throw new ArgumentException("Куб обладает null значением");
         }
         
+        Grid = new List<List<List<Cube>>>();
         double step = startCube.SideLength / partition;
         double halfStep = step * 0.5;
-        
-        
-        Grid = new List<List<List<Cube>>>();
-        int end = partition / 2;
-        int start = end * -1;
         
         Point p;
         double startX = startCube.CentralPoint.X - startCube.SideLength * 0.5 + halfStep;
@@ -108,10 +106,11 @@ public class CubeGrid
         double newSideLengthHalf = startPoint.DistanceBetweenPoint(endPoint) / Math.Sqrt(3);
         double step = newSideLengthHalf / partition;
         double halfStep = step * 0.5;
+        
+        Point p;
         double startX = startPoint.X + halfStep;
         double startY = startPoint.Y + halfStep;
         double startZ = startPoint.Z + halfStep;
-        Point p;
 
         for (int i = 0; i < partition; i++)
         {
@@ -122,7 +121,7 @@ public class CubeGrid
                 for (int k = 0; k < partition; k++)
                 {
                     p = new Point(startX + i * step, startY + j * step, startZ + k * step);
-                    Grid[i][j].Add( new Cube(p, step));
+                    Grid[i][j].Add(new Cube(p, step));
                 }
             }
         }
@@ -147,4 +146,12 @@ public class CubeGrid
         
         return line;
     }
+
+    public List<List<Cube>> this[int index]
+    {
+        get => Grid[index];
+        set => Grid[index] = value;
+    }
+
+    public int Count() => Grid.Count;
 }

@@ -11,7 +11,7 @@ public class CubeLine
     public CubeLine(CubeGrid grid)
     {
         Line = new List<Cube>();
-        int len = grid.Grid.Count;
+        int len = grid.Count();
         for (int i = 0; i < len; i++)
         {
             for (int j = 0; j < len; j++)
@@ -27,7 +27,7 @@ public class CubeLine
     public CubeGrid GenerateGridFromLine()
     {
         CubeGrid grid = new CubeGrid();
-        int len = (int)Math.Pow(this.Line.Count, 1.0/3);
+        int len = (int)Math.Pow(Count(), 1.0/3);
         grid.Grid = new List<List<List<Cube>>>(len);
         
 
@@ -49,7 +49,7 @@ public class CubeLine
 
     public void GeneratePoresByCount(int poreAmount)
     {
-        int len = Line.Count;
+        int len = Count();
         if (poreAmount < 0 || poreAmount >= len)
         {
             throw new ArgumentException("Кол-во пор не может быть меньше 0 и больше кол-во элементов в разбиении");
@@ -73,14 +73,14 @@ public class CubeLine
 
     public void GeneratePoresByPercent(double percent)
     {
-        if (percent < 0 || percent >= 100)
+        if (percent is < 0 or >= 100)
         {
             throw new ArgumentException("Кол-во процентов принадлежит отрезку [0, 100)");
         }
         
         int randIndex;
         int len = Line.Count;
-        int poreCount = this.PoreAmount();
+        int poreCount = PoreAmount();
         double porePercent = (double)poreCount / len;
         Random rand = new Random();
 
@@ -88,9 +88,9 @@ public class CubeLine
         while(porePercent < percent)
         {
             randIndex = rand.Next(len);
-            if (this.Line[randIndex].IsEmpty == false)
+            if (Line[randIndex].IsEmpty == false)
             {
-                this.Line[randIndex].IsEmpty = true;
+                Line[randIndex].IsEmpty = true;
                 poreCount++;
                 porePercent = (double)poreCount / len * 100;
             }
@@ -102,8 +102,16 @@ public class CubeLine
         int count = 0;
         foreach (Cube c in Line)
         {
-            if (c.IsEmpty == true) count++;
+            if (c.IsEmpty) count++;
         }
         return count;
     }
+
+    public Cube this[int index]
+    {
+        get => Line[index];
+        set => Line[index] = value;
+    }
+    
+    public int Count() => Line.Count; 
 }

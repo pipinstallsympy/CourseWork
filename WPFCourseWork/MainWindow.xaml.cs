@@ -1,5 +1,4 @@
-﻿using System.Reflection;
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using CourseWorkZherbin;
@@ -44,13 +43,10 @@ public partial class MainWindow : Window
                 MethodsValue3.Visibility = Visibility.Visible;
                 break;
         }
-        
     }
 
     private void OnMethodSelected(object sender, RoutedEventArgs e)
     {
-        
-        //TODO: Избавится от этого ужаса и сделать также, как и с выбором метода
         var selectedPores = PorePanel.Children
             .OfType<RadioButton>()
             .FirstOrDefault(r => r.IsChecked == true)?.Content.ToString();
@@ -60,7 +56,6 @@ public partial class MainWindow : Window
             MessageBox.Show("Кол-во разбиений задано неверно");
             return;
         }
-        
         if (!double.TryParse(PoresValue.Text, out double poresValue))
         {
             MessageBox.Show("Значение пор задано неверно");
@@ -73,7 +68,6 @@ public partial class MainWindow : Window
                 CalculationsSingular(partition, selectedPores, poresValue);
                 break;
             case 1:
-                
                 CalculationsCube(partition, selectedPores, poresValue); 
                 break;
             case 2:
@@ -83,21 +77,18 @@ public partial class MainWindow : Window
                 MessageBox.Show("Что-то тут не так....");
                 break;
         }
-        
     }
 
-    private void CalculationsSingular(int partition, string poreChoice, double poresValue)
+    private void CalculationsSingular(int partition, string? poreChoice, double poresValue)
     {
         CubeGrid griddy = new CubeGrid(partition);
         CubeLine liney = griddy.GenerateLineFromGrid();
         CreatePores(liney, poreChoice, poresValue);
         
         InitializeCube(liney);
-
-        
     }
     
-    private void CalculationsCube(int partition, string poreChoice, double poresValue)
+    private void CalculationsCube(int partition, string? poreChoice, double poresValue)
     {
         if (!double.TryParse(CenterX.Text, out double centerX))
         {
@@ -134,13 +125,12 @@ public partial class MainWindow : Window
             MessageBox.Show(e.Message);
             return;
         }
-        CreatePores(liney, poreChoice, poresValue);
         
+        CreatePores(liney, poreChoice, poresValue);
         InitializeCube(liney);
-
     }
     
-    private void CalculationsPoints(int partition, string poreChoice, double poresValue)
+    private void CalculationsPoints(int partition, string? poreChoice, double poresValue)
     {
         if (!double.TryParse(P1X.Text, out double p1X))
         {
@@ -190,11 +180,10 @@ public partial class MainWindow : Window
         }
         
         CreatePores(liney, poreChoice, poresValue);
-        
         InitializeCube(liney);
     }
 
-    private void CreatePores(CubeLine liney, string poreChoice, double poresValue)
+    private void CreatePores(CubeLine liney, string? poreChoice, double poresValue)
     {
         try
         {
@@ -224,47 +213,27 @@ public partial class MainWindow : Window
         Viewport.Children.Add(gridLines);
         Viewport.Children.Add(coordinateSystem);
         Viewport.Children.Add(new DefaultLights());
-        
 
-        foreach (Cube c in liney.Line)
+        int len = liney.Count();
+
+        for (int i = 0; i < len; i++)
         {
-            if(c.IsEmpty) continue;
+            if(liney[i].IsEmpty) continue;
             var cube = new BoxVisual3D()
             {
                 Center = new Point3D()
                 {
-                    X = c.CentralPoint.X,
-                    Y = c.CentralPoint.Y,
-                    Z = c.CentralPoint.Z
+                    X = liney[i].CentralPoint.X,
+                    Y = liney[i].CentralPoint.Y,
+                    Z = liney[i].CentralPoint.Z
                 },
-                Width = c.SideLength,
-                Height = c.SideLength,
-                Length = c.SideLength,
+                Width = liney[i].SideLength,
+                Height = liney[i].SideLength,
+                Length = liney[i].SideLength,
                 Material = MaterialHelper.CreateMaterial(Colors.Red)
             };
             
             Viewport.Children.Add(cube);
         }
-        
     }
-}
-
-public class CubeData
-{
-    public Point3D CenterPoint { get; set; }
-    public double SideLength { get; set; }
-    public Color Color { get; set; }
-
-    public CubeData(Cube c)
-    {
-        CenterPoint = CenterPoint with
-        {
-            X = c.CentralPoint.X,
-            Y = c.CentralPoint.Y,
-            Z = c.CentralPoint.Z
-        };
-        SideLength = c.SideLength;
-        Color = Colors.Red;
-    }
-    
 }

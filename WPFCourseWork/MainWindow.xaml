@@ -7,6 +7,7 @@
         mc:Ignorable="d"
         Title="Course Work Zherbin" Height="540" Width="960" WindowStyle="ThreeDBorderWindow">
     <Grid Name="MainRoot" Background="White">
+        
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width = "*"></ColumnDefinition>
             <ColumnDefinition Width = "280"></ColumnDefinition>
@@ -24,10 +25,12 @@
             <Border BorderBrush="Black" BorderThickness="1"></Border>
             <helix:HelixViewport3D x:Name="Viewport">
                 <helix:CoordinateSystemVisual3D />
+                
                 <helix:GridLinesVisual3D 
                     Width="1000" Length="1000" 
                     MinorDistance="1" MajorDistance="1"
                     Thickness="0.01" />
+                
                 <helix:DefaultLights/>
             </helix:HelixViewport3D>
                 
@@ -49,6 +52,7 @@
                     
                     <StackPanel x:Name = "MethodsValue2" Visibility="Collapsed">
                         <Rectangle Height="5"/> <!-- Разделитель между элементами -->
+                        
                         <TextBlock> Координаты центровой точки</TextBlock>
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Margin="0,0,4,0">x:</TextBlock>
@@ -68,12 +72,12 @@
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Margin="0,0,4,0">Длина стороны куба: </TextBlock>
                             <TextBox x:Name = "CubeSideLength" Width="136"></TextBox>
-
                         </StackPanel>
                     </StackPanel>
                     
                     <StackPanel x:Name = "MethodsValue3" Visibility="Collapsed">
                         <Rectangle Height="5"/> <!-- Разделитель между элементами -->
+                        
                         <TextBlock> Координаты первой точки</TextBlock>
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Margin="0,0,4,0">x:</TextBlock>
@@ -89,6 +93,7 @@
                         </StackPanel>
 
                         <Rectangle Height="5"/> <!-- Разделитель между элементами -->
+                        
                         <TextBlock> Координаты второй точки</TextBlock>
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Margin="0,0,4,0">x:</TextBlock>
@@ -130,7 +135,6 @@
                     <TextBox x:Name = "PoresValue" Width="196" Margin="5, 0, 0, 0">
                     </TextBox>
                 </StackPanel>
-
             </StackPanel>
         </Grid>
         
@@ -145,6 +149,5 @@
             VerticalAlignment="Bottom">
             
         </Button>
-
     </Grid>
 </Window>
