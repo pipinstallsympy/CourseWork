@@ -10,7 +10,6 @@ namespace WPFCourseWork;
 
 public partial class MainWindow : Window
 {
-    private static List<BoxVisual3D> cubesVisual = new List<BoxVisual3D>();
     private static GridLinesVisual3D gridLines = new GridLinesVisual3D()
     {
         Width = 1000,     
@@ -81,11 +80,12 @@ public partial class MainWindow : Window
 
     private void CalculationsSingular(int partition, string? poreChoice, double poresValue)
     {
-        CubeGrid griddy = new CubeGrid(partition);
-        CubeLine liney = griddy.GenerateLineFromGrid();
-        CreatePores(liney, poreChoice, poresValue);
-        
-        InitializeCube(liney);
+        using (CubeGrid griddy = new CubeGrid(partition))
+        {
+            CubeLine? liney = griddy.GenerateLineFromGrid();
+            CreatePores(liney, poreChoice, poresValue);
+            InitializeCube(ref liney);
+        }        
     }
     
     private void CalculationsCube(int partition, string? poreChoice, double poresValue)
@@ -113,21 +113,21 @@ public partial class MainWindow : Window
         
         Cube startCube;
         CubeGrid griddy;
-        CubeLine liney;
+        CubeLine? liney;
         try
         {
             startCube = new Cube(new Point(centerX, centerY, centerZ), sideLength);
-            griddy = new CubeGrid(startCube, partition);
-            liney = griddy.GenerateLineFromGrid();
+            using (griddy = new CubeGrid(startCube, partition))
+            {
+                liney = griddy.GenerateLineFromGrid(); 
+                CreatePores(liney, poreChoice, poresValue);
+                InitializeCube(ref liney);
+            }
         }
         catch(Exception e)
         {
             MessageBox.Show(e.Message);
-            return;
         }
-        
-        CreatePores(liney, poreChoice, poresValue);
-        InitializeCube(liney);
     }
     
     private void CalculationsPoints(int partition, string? poreChoice, double poresValue)
@@ -166,24 +166,25 @@ public partial class MainWindow : Window
         Point p1 = new Point(p1X, p1Y, p1Z);
         Point p2 = new Point(p2X, p2Y, p2Z);
         CubeGrid griddy;
-        CubeLine liney;
+        CubeLine? liney;
         
         try
         {
-            griddy = new CubeGrid(p1, p2, partition);
-            liney = griddy.GenerateLineFromGrid();
+            using (griddy = new CubeGrid(p1, p2, partition))
+            {
+                liney = griddy.GenerateLineFromGrid();
+                CreatePores(liney, poreChoice, poresValue);
+                InitializeCube(ref liney);
+            }
         }
         catch (Exception e)
         {
             MessageBox.Show(e.Message);
-            return;
+            
         }
-        
-        CreatePores(liney, poreChoice, poresValue);
-        InitializeCube(liney);
     }
 
-    private void CreatePores(CubeLine liney, string? poreChoice, double poresValue)
+    private void CreatePores(CubeLine? liney, string? poreChoice, double poresValue)
     {
         try
         {
@@ -207,9 +208,10 @@ public partial class MainWindow : Window
     }
 
 
-    private void InitializeCube(CubeLine liney)
+    private void InitializeCube(ref CubeLine? liney)
     {
         Viewport.Children.Clear();
+        GC.Collect(2);
         Viewport.Children.Add(gridLines);
         Viewport.Children.Add(coordinateSystem);
         Viewport.Children.Add(new DefaultLights());
@@ -232,7 +234,6 @@ public partial class MainWindow : Window
                 Length = liney[i].SideLength,
                 Material = MaterialHelper.CreateMaterial(Colors.Red)
             };
-            
             Viewport.Children.Add(cube);
         }
     }

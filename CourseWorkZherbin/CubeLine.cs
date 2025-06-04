@@ -1,6 +1,6 @@
 ﻿namespace CourseWorkZherbin;
 
-public class CubeLine
+public class CubeLine : IDisposable
 {
     public List<Cube> Line;
 
@@ -113,5 +113,11 @@ public class CubeLine
         set => Line[index] = value;
     }
     
-    public int Count() => Line.Count; 
+    public int Count() => Line.Count;
+
+    public void Dispose()
+    {
+        Line.Clear();
+        GC.SuppressFinalize(this);
+    }
 }

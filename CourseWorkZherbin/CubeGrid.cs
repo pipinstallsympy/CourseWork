@@ -1,6 +1,6 @@
 ﻿namespace CourseWorkZherbin;
 
-public class CubeGrid
+public class CubeGrid : IDisposable
 {
     public List<List<List<Cube>>> Grid;
 
@@ -128,9 +128,9 @@ public class CubeGrid
     }
     
 
-    public CubeLine GenerateLineFromGrid()
+    public CubeLine? GenerateLineFromGrid()
     {
-        CubeLine line = new CubeLine();
+        CubeLine? line = new CubeLine();
         int len = Grid.Count;
         
         for (int i = 0; i < len; i++)
@@ -154,4 +154,20 @@ public class CubeGrid
     }
 
     public int Count() => Grid.Count;
+
+    public void Dispose()
+    {
+        int len = Count();
+        for (int i = 0; i < len; i++)
+        {
+            for (int j = 0; j < len; j++)
+            {
+                this[i][j].Clear();
+            }
+            this[i].Clear();
+        }
+        Grid.Clear();
+        
+        GC.SuppressFinalize(this);
+    }
 }

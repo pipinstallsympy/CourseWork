@@ -171,7 +171,7 @@ public class UnitTestCubeGrid
     [MemberData(nameof(TestData_6))]
     public void TestGenerateLineFromGrid(CubeGrid grid)
     {
-        CubeLine testLine = grid.GenerateLineFromGrid();
+        CubeLine? testLine = grid.GenerateLineFromGrid();
 
         int len = grid.Grid.Count;
 
