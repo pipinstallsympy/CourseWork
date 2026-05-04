@@ -1,4 +1,4 @@
-﻿namespace CourseWorkZherbin;
+namespace CourseWorkZherbin;
 
 public class Coherency
 {

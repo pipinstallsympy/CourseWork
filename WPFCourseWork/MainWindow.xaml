@@ -15,7 +15,7 @@
         
         <Grid.RowDefinitions>
             <RowDefinition Height = "*"></RowDefinition>
-            <RowDefinition Height = "80"></RowDefinition>
+            <RowDefinition Height = "Auto"></RowDefinition>
         </Grid.RowDefinitions>
         
         
@@ -39,9 +39,10 @@
                     Background="#CCFFFFFF" BorderBrush="Black" BorderThickness="1"
                     CornerRadius="4">
                 <StackPanel>
-                    <TextBlock x:Name="StatsMaterialCount" Text="Узлов материала: -"/>
-                    <TextBlock x:Name="StatsPoreCount"     Text="Узлов пор: -"/>
-                    <TextBlock x:Name="StatsLastCalcTime"  Text="Время последнего расчёта: -"/>
+                    <TextBlock x:Name="StatsMaterialCount"  Text="Узлов материала: -"/>
+                    <TextBlock x:Name="StatsPoreCount"      Text="Узлов пор: -"/>
+                    <TextBlock x:Name="StatsCoherencyCount" Text="Связных компонент: -"/>
+                    <TextBlock x:Name="StatsLastCalcTime"   Text="Время последнего расчёта: -"/>
                 </StackPanel>
             </Border>
 
@@ -146,26 +147,55 @@
                     <TextBox x:Name = "PoresValue" Width="196" Margin="5, 0, 0, 0">
                     </TextBox>
                 </StackPanel>
+
+                <Rectangle Height="10"/>
+
+                <CheckBox x:Name="ColorComponentsCheckBox"
+                          Checked="OnColorByComponentChanged"
+                          Unchecked="OnColorByComponentChanged"
+                          HorizontalContentAlignment="Left">
+                    <TextBlock Text="Показывать связные участки разными цветами"
+                               TextWrapping="Wrap"
+                               MaxWidth="230"/>
+                </CheckBox>
             </StackPanel>
         </Grid>
         
-        <StackPanel  Grid.Column="1" Grid.Row="1"  Margin="10">
+        <WrapPanel  Grid.Column="1" Grid.Row="1"  Margin="10">
             <Button 
                 Content = "Сгенерировать объект"  
                 Click = "OnMethodSelected" 
-                Margin="10" 
+                Margin="5" 
                 Width="120" 
                 Height="30" 
                 VerticalAlignment="Bottom">
             </Button>
-            
+
+            <Button
+                Content = "Проверка на связность"
+                Click = "OnCheckCoherency"
+                Margin="5"
+                Width="120"
+                Height="30"
+                VerticalAlignment="Bottom">
+            </Button>
+
+            <Button
+                Content = "Соединить компоненты"
+                Click = "OnConnectComponents"
+                Margin="5"
+                Width="120"
+                Height="30"
+                VerticalAlignment="Bottom">
+            </Button>
+
             <Button
                 Content = "Проверка на перколяцию"  
-                Margin="10" 
+                Margin="5" 
                 Width="120" 
                 Height="30" 
                 VerticalAlignment="Bottom">
             </Button>
-        </StackPanel>
+        </WrapPanel>
     </Grid>
 </Window>

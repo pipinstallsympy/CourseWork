@@ -1,4 +1,4 @@
-﻿namespace CourseWorkZherbin;
+namespace CourseWorkZherbin;
 
 public class CubeLine : IDisposable
 {
@@ -27,7 +27,7 @@ public class CubeLine : IDisposable
     public CubeGrid GenerateGridFromLine()
     {
         CubeGrid grid = new CubeGrid();
-        int len = (int)Math.Pow(Count(), 1.0/3);
+        int len = (int)Math.Round(Math.Cbrt(Count()));
         grid.Grid = new List<List<List<Cube>>>(len);
         
 
