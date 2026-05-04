@@ -147,6 +147,56 @@ public class CubeGrid : IDisposable
         return line;
     }
 
+    public List<int>? IndexOf(double x, double y, double z)
+    {
+        double step = Grid[0][0][0].SideLength;
+        List<int> indexes = new List<int>{0,0,0};
+        Cube currentCube = Grid[0][0][0];
+        while (true)
+        {
+            if(currentCube.CentralPoint.X - x <1e-10 &&
+               currentCube.CentralPoint.Y - y <1e-10 &&
+               currentCube.CentralPoint.Z - z <1e-10 
+               ) return indexes;
+            if (currentCube.CentralPoint.X > x ||
+                currentCube.CentralPoint.Y > y ||
+                currentCube.CentralPoint.Z > z) return null;
+            if (currentCube.CentralPoint.X < x)
+            {
+                x += step;
+                indexes[0]++;
+            }
+
+            if (currentCube.CentralPoint.Y < y)
+            {
+                y += step;
+                indexes[1]++;
+            }
+
+            if (currentCube.CentralPoint.Z < z)
+            {
+                z += step;
+                indexes[2]++;
+            }
+        }
+    }
+    
+    public List<int>? IndexOf(Cube c)
+    {
+        for (int i = 0; i < Grid.Count; i++)
+        {
+            for (int j = 0; j < Grid.Count; j++)
+            {
+                for (int k = 0; k < Grid.Count; k++)
+                {
+                    if(Grid[i][j][k] == c) return new List<int>{i, j, k};
+                } 
+            } 
+        }
+
+        return null;
+    }
+
     public List<List<Cube>> this[int index]
     {
         get => Grid[index];

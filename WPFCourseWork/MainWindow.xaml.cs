@@ -19,6 +19,7 @@ public partial class MainWindow : Window
         Thickness = 0.01,   
     };
     private static CoordinateSystemVisual3D coordinateSystem = new CoordinateSystemVisual3D();
+    private static List<TreeNode<Cube>> coherenceTreeList  = new List<TreeNode<Cube>>();
     public MainWindow()
     {
         InitializeComponent();
@@ -182,6 +183,12 @@ public partial class MainWindow : Window
             MessageBox.Show(e.Message);
             
         }
+    }
+
+    private void CreateCoherenceList()
+    {
+        List<Cube> material = new List<Cube>();
+        
     }
 
     private void CreatePores(CubeLine? liney, string? poreChoice, double poresValue)

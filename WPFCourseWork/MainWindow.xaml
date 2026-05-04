@@ -138,16 +138,23 @@
             </StackPanel>
         </Grid>
         
-        <Button 
-            Grid.Column="1" 
-            Grid.Row="1" 
-            Content = "Начать расчеты"  
-            Click = "OnMethodSelected" 
-            Margin="10" 
-            Width="120" 
-            Height="30" 
-            VerticalAlignment="Bottom">
+        <StackPanel  Grid.Column="1" Grid.Row="1"  Margin="10">
+            <Button 
+                Content = "Сгенерировать объект"  
+                Click = "OnMethodSelected" 
+                Margin="10" 
+                Width="120" 
+                Height="30" 
+                VerticalAlignment="Bottom">
+            </Button>
             
-        </Button>
+            <Button
+                Content = "Проверка на перколяцию"  
+                Margin="10" 
+                Width="120" 
+                Height="30" 
+                VerticalAlignment="Bottom">
+            </Button>
+        </StackPanel>
     </Grid>
 </Window>

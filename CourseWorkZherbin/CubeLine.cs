@@ -107,6 +107,19 @@ public class CubeLine : IDisposable
         return count;
     }
 
+
+    public List<Cube> GetMaterial()
+    {
+        List<Cube> material = new List<Cube>();
+
+        foreach (Cube c in Line)
+        {
+            if (!c.IsEmpty) material.Add(c);
+        }
+        
+        return material;
+    }
+
     public Cube this[int index]
     {
         get => Line[index];
