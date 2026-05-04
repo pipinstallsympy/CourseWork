@@ -1,4 +1,4 @@
-﻿<Window x:Class="WPFCourseWork.MainWindow"
+<Window x:Class="WPFCourseWork.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -33,7 +33,18 @@
                 
                 <helix:DefaultLights/>
             </helix:HelixViewport3D>
-                
+
+            <Border HorizontalAlignment="Left" VerticalAlignment="Bottom"
+                    Margin="10" Padding="10,8"
+                    Background="#CCFFFFFF" BorderBrush="Black" BorderThickness="1"
+                    CornerRadius="4">
+                <StackPanel>
+                    <TextBlock x:Name="StatsMaterialCount" Text="Узлов материала: -"/>
+                    <TextBlock x:Name="StatsPoreCount"     Text="Узлов пор: -"/>
+                    <TextBlock x:Name="StatsLastCalcTime"  Text="Время последнего расчёта: -"/>
+                </StackPanel>
+            </Border>
+
         </Grid>
         
         

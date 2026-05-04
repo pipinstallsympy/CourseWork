@@ -1,4 +1,5 @@
-﻿using System.Windows;
+using System.Diagnostics;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using CourseWorkZherbin;
@@ -65,13 +66,13 @@ public partial class MainWindow : Window
         switch (MethodsPanel.SelectedIndex)
         {
             case 0:
-                CalculationsSingular(partition, selectedPores, poresValue);
+                RunTimedCalculation(() => CalculationsSingular(partition, selectedPores, poresValue));
                 break;
             case 1:
-                CalculationsCube(partition, selectedPores, poresValue); 
+                RunTimedCalculation(() => CalculationsCube(partition, selectedPores, poresValue));
                 break;
             case 2:
-                CalculationsPoints(partition, selectedPores, poresValue);
+                RunTimedCalculation(() => CalculationsPoints(partition, selectedPores, poresValue));
                 break;
             default:
                 MessageBox.Show("Что-то тут не так....");
@@ -85,6 +86,7 @@ public partial class MainWindow : Window
         {
             CubeLine? liney = griddy.GenerateLineFromGrid();
             CreatePores(liney, poreChoice, poresValue);
+            UpdateNodeStats(liney);
             InitializeCube(ref liney);
         }        
     }
@@ -122,6 +124,7 @@ public partial class MainWindow : Window
             {
                 liney = griddy.GenerateLineFromGrid(); 
                 CreatePores(liney, poreChoice, poresValue);
+                UpdateNodeStats(liney);
                 InitializeCube(ref liney);
             }
         }
@@ -175,6 +178,7 @@ public partial class MainWindow : Window
             {
                 liney = griddy.GenerateLineFromGrid();
                 CreatePores(liney, poreChoice, poresValue);
+                UpdateNodeStats(liney);
                 InitializeCube(ref liney);
             }
         }
@@ -189,6 +193,23 @@ public partial class MainWindow : Window
     {
         List<Cube> material = new List<Cube>();
         
+    }
+
+    private void RunTimedCalculation(Action calculation)
+    {
+        var sw = Stopwatch.StartNew();
+        calculation();
+        sw.Stop();
+        StatsLastCalcTime.Text = $"Время последнего расчёта: {sw.ElapsedMilliseconds} мс";
+    }
+
+    private void UpdateNodeStats(CubeLine? liney)
+    {
+        if (liney == null) return;
+        int total = liney.Count();
+        int pores = liney.PoreAmount();
+        StatsMaterialCount.Text = $"Узлов материала: {total - pores}";
+        StatsPoreCount.Text     = $"Узлов пор: {pores}";
     }
 
     private void CreatePores(CubeLine? liney, string? poreChoice, double poresValue)
