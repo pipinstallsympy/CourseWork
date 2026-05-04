@@ -39,10 +39,11 @@
                     Background="#CCFFFFFF" BorderBrush="Black" BorderThickness="1"
                     CornerRadius="4">
                 <StackPanel>
-                    <TextBlock x:Name="StatsMaterialCount"  Text="Узлов материала: -"/>
-                    <TextBlock x:Name="StatsPoreCount"      Text="Узлов пор: -"/>
-                    <TextBlock x:Name="StatsCoherencyCount" Text="Связных компонент: -"/>
-                    <TextBlock x:Name="StatsLastCalcTime"   Text="Время последнего расчёта: -"/>
+                    <TextBlock x:Name="StatsMaterialCount"   Text="Узлов материала: -"/>
+                    <TextBlock x:Name="StatsPoreCount"       Text="Узлов пор: -"/>
+                    <TextBlock x:Name="StatsCoherencyCount"  Text="Связных компонент: -"/>
+                    <TextBlock x:Name="StatsPercolationCount" Text="Деревьев перколяции: -"/>
+                    <TextBlock x:Name="StatsLastCalcTime"    Text="Время последнего расчёта: -"/>
                 </StackPanel>
             </Border>
 
@@ -167,6 +168,18 @@
                                TextWrapping="Wrap"
                                MaxWidth="230"/>
                 </CheckBox>
+
+                <Rectangle Height="5"/>
+
+                <CheckBox x:Name="ShowPercolationCheckBox"
+                          IsEnabled="False"
+                          Checked="OnShowPercolationChanged"
+                          Unchecked="OnShowPercolationChanged"
+                          HorizontalContentAlignment="Left">
+                    <TextBlock Text="Просмотр деревьев перколяции"
+                               TextWrapping="Wrap"
+                               MaxWidth="230"/>
+                </CheckBox>
             </StackPanel>
         </Grid>
         
@@ -199,7 +212,8 @@
             </Button>
 
             <Button
-                Content = "Проверка на перколяцию"  
+                Content = "Проверка на перколяцию"
+                Click = "OnCheckPercolation"
                 Margin="5" 
                 Width="120" 
                 Height="30" 

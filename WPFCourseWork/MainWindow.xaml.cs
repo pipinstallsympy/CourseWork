@@ -24,6 +24,8 @@ public partial class MainWindow : Window
 
     private CubeLine? _currentLine;
     private Dictionary<Cube, Color>? _cubeColorMap;
+    private PermeabilityTreeList? _permeabilityTreeList;
+    private HashSet<Cube>? _percolationBoundaryPores;
 
     public MainWindow()
     {
@@ -244,6 +246,12 @@ public partial class MainWindow : Window
         coherenceTreeList = new List<TreeNode<Cube>>();
         _cubeColorMap = null;
         StatsCoherencyCount.Text = "Связных компонент: -";
+
+        _permeabilityTreeList = null;
+        _percolationBoundaryPores = null;
+        StatsPercolationCount.Text = "Деревьев перколяции: -";
+        ShowPercolationCheckBox.IsChecked = false;
+        ShowPercolationCheckBox.IsEnabled = false;
     }
 
     private void OnCheckCoherency(object sender, RoutedEventArgs e)
@@ -276,6 +284,70 @@ public partial class MainWindow : Window
     {
         if (_currentLine == null) return;
         RedrawCubes();
+    }
+
+    private void OnCheckPercolation(object sender, RoutedEventArgs e)
+    {
+        if (_currentLine == null)
+        {
+            MessageBox.Show("Сначала сгенерируйте объект");
+            return;
+        }
+
+        try
+        {
+            using var grid = _currentLine.GenerateGridFromLine();
+            if (grid.Count() == 0)
+            {
+                MessageBox.Show("Сетка пуста");
+                return;
+            }
+
+            double fullSideLength = grid[0][0][0].SideLength * grid.Count();
+
+            var sw = Stopwatch.StartNew();
+            _permeabilityTreeList = new PermeabilityTreeList(grid, fullSideLength);
+            var dict = new PermeabilityDictionary(_permeabilityTreeList);
+            _percolationBoundaryPores = CollectBoundaryPores(dict);
+            sw.Stop();
+
+            StatsPercolationCount.Text = $"Деревьев перколяции: {_permeabilityTreeList.TreeList.Count}";
+            StatsLastCalcTime.Text = $"Время последнего расчёта: {sw.ElapsedMilliseconds} мс";
+
+            ShowPercolationCheckBox.IsEnabled = true;
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(ex.Message);
+        }
+    }
+
+    private void OnShowPercolationChanged(object sender, RoutedEventArgs e)
+    {
+        if (_currentLine == null) return;
+        RedrawCubes();
+    }
+
+    private static HashSet<Cube> CollectBoundaryPores(PermeabilityDictionary dict)
+    {
+        var pores = new HashSet<Cube>();
+        AddPoresFrom(dict.EndToEndPermeability, pores);
+        AddPoresFrom(dict.PartialPermeability, pores);
+        return pores;
+    }
+
+    private static void AddPoresFrom(
+        Dictionary<TreeNode<Cube>, List<TreeNode<Cube>>> source,
+        HashSet<Cube> target)
+    {
+        foreach (var kvp in source)
+        {
+            target.Add(kvp.Key.Value);
+            foreach (var node in kvp.Value)
+            {
+                target.Add(node.Value);
+            }
+        }
     }
 
     private void OnConnectComponents(object sender, RoutedEventArgs e)
@@ -483,11 +555,30 @@ public partial class MainWindow : Window
                                   && _cubeColorMap != null
                                   && _cubeColorMap.Count > 0;
 
+        bool showPercolation = ShowPercolationCheckBox.IsChecked == true
+                               && _percolationBoundaryPores != null;
+
         int len = _currentLine.Count();
+        Point3DCollection? materialEdges = showPercolation ? new Point3DCollection() : null;
+
         for (int i = 0; i < len; i++)
         {
             var current = _currentLine[i];
-            if (current.IsEmpty) continue;
+
+            if (current.IsEmpty)
+            {
+                if (!showPercolation) continue;
+                if (!_percolationBoundaryPores!.Contains(current)) continue;
+
+                AddCubeVisual(current, Colors.DodgerBlue, 1.0);
+                continue;
+            }
+
+            if (showPercolation)
+            {
+                AddCubeEdges(materialEdges!, current);
+                continue;
+            }
 
             Color color = Colors.Red;
             if (useComponentColors && _cubeColorMap!.TryGetValue(current, out var mapped))
@@ -495,20 +586,69 @@ public partial class MainWindow : Window
                 color = mapped;
             }
 
-            var cube = new BoxVisual3D()
-            {
-                Center = new Point3D()
-                {
-                    X = current.CentralPoint.X,
-                    Y = current.CentralPoint.Y,
-                    Z = current.CentralPoint.Z
-                },
-                Width = current.SideLength,
-                Height = current.SideLength,
-                Length = current.SideLength,
-                Material = MaterialHelper.CreateMaterial(color)
-            };
-            Viewport.Children.Add(cube);
+            AddCubeVisual(current, color, 1.0);
         }
+
+        if (showPercolation && materialEdges!.Count > 0)
+        {
+            var wire = new LinesVisual3D
+            {
+                Points = materialEdges,
+                Color = Colors.DimGray,
+                Thickness = 1.0
+            };
+            Viewport.Children.Add(wire);
+        }
+    }
+
+    private static void AddCubeEdges(Point3DCollection points, Cube cube)
+    {
+        double s = cube.SideLength * 0.5;
+        double cx = cube.CentralPoint.X;
+        double cy = cube.CentralPoint.Y;
+        double cz = cube.CentralPoint.Z;
+
+        var p000 = new Point3D(cx - s, cy - s, cz - s);
+        var p100 = new Point3D(cx + s, cy - s, cz - s);
+        var p010 = new Point3D(cx - s, cy + s, cz - s);
+        var p110 = new Point3D(cx + s, cy + s, cz - s);
+        var p001 = new Point3D(cx - s, cy - s, cz + s);
+        var p101 = new Point3D(cx + s, cy - s, cz + s);
+        var p011 = new Point3D(cx - s, cy + s, cz + s);
+        var p111 = new Point3D(cx + s, cy + s, cz + s);
+
+        points.Add(p000); points.Add(p100);
+        points.Add(p100); points.Add(p110);
+        points.Add(p110); points.Add(p010);
+        points.Add(p010); points.Add(p000);
+
+        points.Add(p001); points.Add(p101);
+        points.Add(p101); points.Add(p111);
+        points.Add(p111); points.Add(p011);
+        points.Add(p011); points.Add(p001);
+
+        points.Add(p000); points.Add(p001);
+        points.Add(p100); points.Add(p101);
+        points.Add(p110); points.Add(p111);
+        points.Add(p010); points.Add(p011);
+    }
+
+    private void AddCubeVisual(Cube current, Color color, double opacity)
+    {
+        var brush = new SolidColorBrush(color) { Opacity = opacity };
+        var box = new BoxVisual3D()
+        {
+            Center = new Point3D()
+            {
+                X = current.CentralPoint.X,
+                Y = current.CentralPoint.Y,
+                Z = current.CentralPoint.Z
+            },
+            Width = current.SideLength,
+            Height = current.SideLength,
+            Length = current.SideLength,
+            Material = MaterialHelper.CreateMaterial(brush)
+        };
+        Viewport.Children.Add(box);
     }
 }

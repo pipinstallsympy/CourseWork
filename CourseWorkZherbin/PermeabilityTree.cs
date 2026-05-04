@@ -1,4 +1,4 @@
-﻿namespace CourseWorkZherbin;
+namespace CourseWorkZherbin;
 
 public class PermeabilityTreeList
 {
@@ -9,9 +9,22 @@ public class PermeabilityTreeList
         Coherency coherency = new Coherency();
         List<TreeNode<Cube>> nodes = coherency.CreateCT(grid, false);
 
+        int n = grid.Count();
+        Cube c000 = grid[0][0][0];
+        Cube cnnn = grid[n - 1][n - 1][n - 1];
+        double halfSide = c000.SideLength * 0.5;
+        double minX = c000.X - halfSide;
+        double minY = c000.Y - halfSide;
+        double minZ = c000.Z - halfSide;
+        double maxX = cnnn.X + halfSide;
+        double maxY = cnnn.Y + halfSide;
+        double maxZ = cnnn.Z + halfSide;
+
         foreach (TreeNode<Cube> node in nodes)
         {
-            PermeabilityTree tree = new PermeabilityTree(node, fullSideLength);
+            PermeabilityTree tree = new PermeabilityTree(
+                node, fullSideLength,
+                minX, minY, minZ, maxX, maxY, maxZ);
             if (tree.edgeNodes.Count > 1 && (tree.PartialPermeability.Count > 0 || tree.EndToEndPermeability.Count > 0))
                 TreeList.Add(tree);
 
@@ -59,10 +72,24 @@ public class PermeabilityTree
     public Dictionary<TreeNode<Cube>, List<TreeNode<Cube>>> EndToEndPermeability = new();
     public Dictionary<TreeNode<Cube>, List<TreeNode<Cube>>> PartialPermeability = new();
 
-    public PermeabilityTree(TreeNode<Cube> startNode, double fullSideLength)
+    private readonly double _minX;
+    private readonly double _minY;
+    private readonly double _minZ;
+    private readonly double _maxX;
+    private readonly double _maxY;
+    private readonly double _maxZ;
+
+    public PermeabilityTree(
+        TreeNode<Cube> startNode,
+        double fullSideLength,
+        double minX, double minY, double minZ,
+        double maxX, double maxY, double maxZ)
     {
         this.startNode = startNode;
-        edgeNodes.Add(startNode);
+        _minX = minX; _minY = minY; _minZ = minZ;
+        _maxX = maxX; _maxY = maxY; _maxZ = maxZ;
+
+        if (IsOnGridBoundary(startNode.Value)) edgeNodes.Add(startNode);
         CreateEdgeNodes(startNode);
         CreateDictionaries(fullSideLength);
     }
@@ -71,9 +98,18 @@ public class PermeabilityTree
     { 
         foreach (TreeNode<Cube> node in n.Children)
         {
-            if(node.Value.IsEmpty) edgeNodes.Add(node);
-             CreateEdgeNodes(node);
+            if (node.Value.IsEmpty && IsOnGridBoundary(node.Value)) edgeNodes.Add(node);
+            CreateEdgeNodes(node);
         }
+    }
+
+    private bool IsOnGridBoundary(Cube c)
+    {
+        double half = c.SideLength * 0.5;
+        const double eps = 1e-9;
+        return Math.Abs(c.X - (_minX + half)) < eps || Math.Abs(c.X - (_maxX - half)) < eps
+            || Math.Abs(c.Y - (_minY + half)) < eps || Math.Abs(c.Y - (_maxY - half)) < eps
+            || Math.Abs(c.Z - (_minZ + half)) < eps || Math.Abs(c.Z - (_maxZ - half)) < eps;
     }
 
     private void CreateDictionaries(double fullSideLength)
