@@ -12,5 +12,8 @@ public class Cube: Figure
         SideLength = sideLength;
         IsEmpty = false;
     }
-
+    
+    public double X  =>  CentralPoint.X;
+    public double Y  =>  CentralPoint.Y;
+    public double Z  =>  CentralPoint.Z;
 }

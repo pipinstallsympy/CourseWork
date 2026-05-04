@@ -2,31 +2,31 @@ namespace CourseWorkZherbin;
 
 public class Coherency
 {
-    static List<Cube> material = new List<Cube>(); 
-    static List<Cube> usedMaterial = new List<Cube>();
+    static List<Cube> freeNodes = new List<Cube>(); 
+    static List<Cube> usedNodes = new List<Cube>();
     static CubeGrid grid;
     private static int count;
-    public List<TreeNode<Cube>> CreateCT(CubeGrid g)
+    public List<TreeNode<Cube>> CreateCT(CubeGrid g, bool isMaterial = true)
     {
-        material = g.GetMaterial();
-        usedMaterial.Clear();
+        freeNodes = isMaterial ? g.GetMaterial() : g.GetPores();
+        usedNodes.Clear();
         grid = g;
         count = grid.Count();
         
         List<TreeNode<Cube>> nodes = new List<TreeNode<Cube>>();
-        while (material.Count > 0)
+        while (freeNodes.Count > 0)
         {
-            usedMaterial.Add(material[0]);
-            TreeNode<Cube> node = new TreeNode<Cube>(material[0]);
-            material.RemoveAt(0);
+            usedNodes.Add(freeNodes[0]);
+            TreeNode<Cube> node = new TreeNode<Cube>(freeNodes[0]);
+            freeNodes.RemoveAt(0);
             nodes.Add(node);
-            RecursionCT(node);
+            RecursionCT(node, isMaterial);
         }
 
         return nodes;
     }
 
-    private void RecursionCT(TreeNode<Cube> node)
+    private void RecursionCT(TreeNode<Cube> node, bool isMaterial)
     {
         List<int>? currIndex = grid.IndexOf(node.Value);
         if (currIndex == null) throw new NullReferenceException("Recursion CT");
@@ -44,15 +44,15 @@ public class Coherency
                     if (Math.Abs(i) + Math.Abs(j) + Math.Abs(k) != 1) continue;
 
                     Cube c = grid[x + i][y + j][z + k];
-                    if(c.IsEmpty) continue;
-                    if(usedMaterial.Contains(c)) continue;
-                    material.Remove(c);
-                    usedMaterial.Add(c);
+                    if(!(c.IsEmpty ^ isMaterial)) continue;
+                    if(usedNodes.Contains(c)) continue;
+                    freeNodes.Remove(c);
+                    usedNodes.Add(c);
 
                     TreeNode<Cube> newChild = new TreeNode<Cube>(c);
                     newChild.Parent = node;
                     node.Children.Add(newChild);
-                    RecursionCT(newChild);
+                    RecursionCT(newChild, isMaterial);
                 }
             }
         }

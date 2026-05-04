@@ -3,7 +3,7 @@
 public class TreeNode<T>
 {
     public T Value { get; set; }
-    public TreeNode<T> Parent { get; set; }
+    public TreeNode<T>? Parent { get; set; } = null;
     public List<TreeNode<T>> Children { get; set; }
 
     public TreeNode(T value)

@@ -163,6 +163,23 @@ public class CubeGrid : IDisposable
 
         return material;
     }
+    
+    public List<Cube> GetPores()
+    {
+        List<Cube> material = new List<Cube>();
+        for (int i = 0; i < Grid.Count; i++)
+        {
+            for (int j = 0; j < Grid.Count; j++)
+            {
+                for (int k = 0; k < Grid.Count; k++)
+                {
+                    if(Grid[i][j][k].IsEmpty)  material.Add(Grid[i][j][k]);
+                }
+            }
+        }
+
+        return material;
+    }
 
     public List<int>? IndexOf(double x, double y, double z)
     {

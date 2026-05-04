@@ -288,6 +288,7 @@ public partial class MainWindow : Window
 
         try
         {
+            bool preserveMaterial = PreserveMaterialCheckBox?.IsChecked == true;
             var sw = Stopwatch.StartNew();
 
             using var grid = _currentLine.GenerateGridFromLine();
@@ -302,12 +303,24 @@ public partial class MainWindow : Window
 
             var bridges = new CoherencyConnector().ConnectAll(grid, components);
 
-            foreach (var bridge in bridges)
+            var distinctBridgeCubes = new HashSet<Cube>();
+            foreach (var b in bridges)
+                foreach (var c in b.EmptyCubesToFill)
+                    distinctBridgeCubes.Add(c);
+
+            int bridgeCubesCount = distinctBridgeCubes.Count;
+            int leavesShortage = 0;
+
+            if (preserveMaterial && bridgeCubesCount > 0)
             {
-                foreach (var cube in bridge.EmptyCubesToFill)
-                {
-                    if (cube.IsEmpty) cube.IsEmpty = false;
-                }
+                var forbidden = BuildForbiddenSet(grid, distinctBridgeCubes);
+                int removed = RemoveLeavesCascade(components, forbidden, bridgeCubesCount);
+                leavesShortage = bridgeCubesCount - removed;
+            }
+
+            foreach (var cube in distinctBridgeCubes)
+            {
+                if (cube.IsEmpty) cube.IsEmpty = false;
             }
 
             using var gridAfter = _currentLine.GenerateGridFromLine();
@@ -321,11 +334,91 @@ public partial class MainWindow : Window
             StatsLastCalcTime.Text = $"Время последнего расчёта: {sw.ElapsedMilliseconds} мс";
 
             RedrawCubes();
+
+            if (leavesShortage > 0)
+            {
+                MessageBox.Show(
+                    $"Не хватило листовых узлов материала для полного сохранения количества: " +
+                    $"{leavesShortage} соединяющих узлов добавлены без компенсации.");
+            }
         }
         catch (Exception ex)
         {
             MessageBox.Show(ex.Message);
         }
+    }
+
+    private static int RemoveLeavesCascade(
+        List<TreeNode<Cube>> components,
+        HashSet<Cube> forbidden,
+        int target)
+    {
+        var leaves = new Queue<TreeNode<Cube>>();
+        foreach (var root in components)
+        {
+            var stack = new Stack<TreeNode<Cube>>();
+            stack.Push(root);
+            while (stack.Count > 0)
+            {
+                var n = stack.Pop();
+                if (n.Children.Count == 0) leaves.Enqueue(n);
+                foreach (var ch in n.Children) stack.Push(ch);
+            }
+        }
+
+        int removed = 0;
+        while (removed < target && leaves.Count > 0)
+        {
+            var leaf = leaves.Dequeue();
+            if (leaf.Children.Count > 0) continue;
+            if (forbidden.Contains(leaf.Value)) continue;
+
+            leaf.Value.IsEmpty = true;
+            var parent = leaf.Parent;
+            if (parent != null)
+            {
+                parent.Children.Remove(leaf);
+                if (parent.Children.Count == 0) leaves.Enqueue(parent);
+            }
+            removed++;
+        }
+        return removed;
+    }
+
+    private static HashSet<Cube> BuildForbiddenSet(CubeGrid grid, IEnumerable<Cube> bridgeCubes)
+    {
+        int n = grid.Count();
+        var coords = new Dictionary<Cube, (int x, int y, int z)>(n * n * n);
+        for (int i = 0; i < n; i++)
+        {
+            for (int j = 0; j < n; j++)
+            {
+                for (int k = 0; k < n; k++)
+                {
+                    coords[grid[i][j][k]] = (i, j, k);
+                }
+            }
+        }
+
+        int[] dx = [0, 1, -1, 0, 0, 0, 0];
+        int[] dy = [0, 0, 0, 1, -1, 0, 0];
+        int[] dz = [0, 0, 0, 0, 0, 1, -1];
+
+        var forbidden = new HashSet<Cube>();
+        foreach (var c in bridgeCubes)
+        {
+            if (!coords.TryGetValue(c, out var pos)) continue;
+            for (int i = 0; i < 7; i++)
+            {
+                int nx = pos.x + dx[i];
+                int ny = pos.y + dy[i];
+                int nz = pos.z + dz[i];
+                if (nx < 0 || ny < 0 || nz < 0) continue;
+                if (nx >= n || ny >= n || nz >= n) continue;
+                forbidden.Add(grid[nx][ny][nz]);
+            }
+        }
+        return forbidden;
     }
 
     private static Dictionary<Cube, Color> BuildColorMap(List<TreeNode<Cube>> components)
