@@ -189,11 +189,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private void CreateCoherenceList()
-    {
-        List<Cube> material = new List<Cube>();
-        
-    }
+    
 
     private void RunTimedCalculation(Action calculation)
     {
@@ -228,11 +224,20 @@ public partial class MainWindow : Window
                     MessageBox.Show("При выборе метода созданию пор пошло что-то не так");
                     break;
             }
+            CreateCoherenceList(liney.GenerateGridFromLine());
         }
         catch (Exception e)
         {
             MessageBox.Show(e.Message);
         }
+    }
+    
+    private void CreateCoherenceList(CubeGrid g)
+    {
+        Coherency coherency = new Coherency();
+        coherenceTreeList = coherency.CreateCT(g);
+
+        MessageBox.Show($"Cohenerency count: {coherenceTreeList.Count}");
     }
 
 
