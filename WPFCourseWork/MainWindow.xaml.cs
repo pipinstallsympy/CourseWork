@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using CourseWorkZherbin;
 using Point = CourseWorkZherbin.Point;
@@ -26,11 +27,43 @@ public partial class MainWindow : Window
     private Dictionary<Cube, Color>? _cubeColorMap;
     private PermeabilityTreeList? _permeabilityTreeList;
     private HashSet<Cube>? _percolationBoundaryPores;
+    private Cube? _selectedBoundaryPore;
+    private Dictionary<Cube, HashSet<Cube>>? _partialPeersByCube;
+    private Dictionary<Cube, HashSet<Cube>>? _endToEndPeersByCube;
+    private readonly Dictionary<Visual3D, Cube> _visualToCube = new();
+
+    // #region agent log
+    private const string DebugLogPath = @"D:\labs\c#\CourseWorkZherbin\debug-fc019b.log";
+    private static int _debugFaceCallCounter = 0;
+    private static int _debugRunId = 0;
+
+    private static void DebugLog(string hypothesisId, string location, string message, object? data = null)
+    {
+        try
+        {
+            var payload = new Dictionary<string, object?>
+            {
+                ["sessionId"] = "fc019b",
+                ["runId"] = $"run{_debugRunId}",
+                ["hypothesisId"] = hypothesisId,
+                ["id"] = $"log_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{Guid.NewGuid().ToString("N").Substring(0, 6)}",
+                ["timestamp"] = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                ["location"] = location,
+                ["message"] = message,
+                ["data"] = data
+            };
+            string line = System.Text.Json.JsonSerializer.Serialize(payload);
+            System.IO.File.AppendAllText(DebugLogPath, line + "\n");
+        }
+        catch { }
+    }
+    // #endregion
 
     public MainWindow()
     {
         InitializeComponent();
         MethodsPanel.SelectionChanged += OnSelectionChanged;
+        Viewport.PreviewMouseLeftButtonDown += OnViewport3DClick;
     }
 
     private void OnSelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -249,6 +282,9 @@ public partial class MainWindow : Window
 
         _permeabilityTreeList = null;
         _percolationBoundaryPores = null;
+        _partialPeersByCube = null;
+        _endToEndPeersByCube = null;
+        _selectedBoundaryPore = null;
         StatsPercolationCount.Text = "Деревьев перколяции: -";
         ShowPercolationCheckBox.IsChecked = false;
         ShowPercolationCheckBox.IsEnabled = false;
@@ -308,7 +344,9 @@ public partial class MainWindow : Window
             var sw = Stopwatch.StartNew();
             _permeabilityTreeList = new PermeabilityTreeList(grid, fullSideLength);
             var dict = new PermeabilityDictionary(_permeabilityTreeList);
-            _percolationBoundaryPores = CollectBoundaryPores(dict);
+            (_percolationBoundaryPores, _partialPeersByCube, _endToEndPeersByCube)
+                = BuildPercolationIndex(dict);
+            _selectedBoundaryPore = null;
             sw.Stop();
 
             StatsPercolationCount.Text = $"Деревьев перколяции: {_permeabilityTreeList.TreeList.Count}";
@@ -324,28 +362,105 @@ public partial class MainWindow : Window
 
     private void OnShowPercolationChanged(object sender, RoutedEventArgs e)
     {
+        if (ShowPercolationCheckBox.IsChecked != true)
+        {
+            _selectedBoundaryPore = null;
+        }
         if (_currentLine == null) return;
         RedrawCubes();
     }
 
-    private static HashSet<Cube> CollectBoundaryPores(PermeabilityDictionary dict)
+    private void OnViewport3DClick(object sender, MouseButtonEventArgs e)
     {
-        var pores = new HashSet<Cube>();
-        AddPoresFrom(dict.EndToEndPermeability, pores);
-        AddPoresFrom(dict.PartialPermeability, pores);
-        return pores;
+        if (ShowPercolationCheckBox.IsChecked != true) return;
+        if (_percolationBoundaryPores == null) return;
+
+        var pt = e.GetPosition(Viewport);
+        var hits = Viewport3DHelper.FindHits(Viewport.Viewport, pt);
+        foreach (var h in hits)
+        {
+            if (_visualToCube.TryGetValue(h.Visual, out var cube))
+            {
+                if (!ReferenceEquals(_selectedBoundaryPore, cube))
+                {
+                    _selectedBoundaryPore = cube;
+                    // #region agent log
+                    var endToEndList = (_endToEndPeersByCube != null
+                                        && _endToEndPeersByCube.TryGetValue(cube, out var eList))
+                        ? eList.Select(c => new { c.X, c.Y, c.Z }).ToList()
+                        : new List<dynamic>().Select(_ => new { X = 0.0, Y = 0.0, Z = 0.0 }).ToList();
+                    var partialList = (_partialPeersByCube != null
+                                       && _partialPeersByCube.TryGetValue(cube, out var pList))
+                        ? pList.Select(c => new { c.X, c.Y, c.Z }).ToList()
+                        : new List<dynamic>().Select(_ => new { X = 0.0, Y = 0.0, Z = 0.0 }).ToList();
+
+                    DebugLog("H7,H8,H9", "MainWindow.xaml.cs:OnViewport3DClick",
+                        "Pore selected",
+                        new
+                        {
+                            selected = new { cube.X, cube.Y, cube.Z },
+                            inEndToEndDict = _endToEndPeersByCube?.ContainsKey(cube) ?? false,
+                            inPartialDict = _partialPeersByCube?.ContainsKey(cube) ?? false,
+                            endToEndPeerCount = endToEndList.Count,
+                            endToEndPeers = endToEndList,
+                            partialPeerCount = partialList.Count,
+                            partialPeers = partialList
+                        });
+                    // #endregion
+                    RedrawCubes();
+                }
+                e.Handled = true;
+                return;
+            }
+        }
+
+        if (_selectedBoundaryPore != null)
+        {
+            _selectedBoundaryPore = null;
+            RedrawCubes();
+        }
     }
 
-    private static void AddPoresFrom(
+    private static (HashSet<Cube> boundary,
+                    Dictionary<Cube, HashSet<Cube>> partialPeers,
+                    Dictionary<Cube, HashSet<Cube>> endToEndPeers)
+        BuildPercolationIndex(PermeabilityDictionary dict)
+    {
+        var boundary = new HashSet<Cube>();
+        var partial = new Dictionary<Cube, HashSet<Cube>>();
+        var endToEnd = new Dictionary<Cube, HashSet<Cube>>();
+
+        AccumulatePeers(dict.PartialPermeability, partial, boundary);
+        AccumulatePeers(dict.EndToEndPermeability, endToEnd, boundary);
+
+        return (boundary, partial, endToEnd);
+    }
+
+    private static void AccumulatePeers(
         Dictionary<TreeNode<Cube>, List<TreeNode<Cube>>> source,
-        HashSet<Cube> target)
+        Dictionary<Cube, HashSet<Cube>> peers,
+        HashSet<Cube> boundary)
     {
         foreach (var kvp in source)
         {
-            target.Add(kvp.Key.Value);
+            Cube a = kvp.Key.Value;
+            boundary.Add(a);
+            if (!peers.TryGetValue(a, out var listA))
+            {
+                listA = new HashSet<Cube>();
+                peers[a] = listA;
+            }
             foreach (var node in kvp.Value)
             {
-                target.Add(node.Value);
+                Cube b = node.Value;
+                boundary.Add(b);
+                listA.Add(b);
+                if (!peers.TryGetValue(b, out var listB))
+                {
+                    listB = new HashSet<Cube>();
+                    peers[b] = listB;
+                }
+                listB.Add(a);
             }
         }
     }
@@ -544,6 +659,7 @@ public partial class MainWindow : Window
     private void RedrawCubes()
     {
         Viewport.Children.Clear();
+        _visualToCube.Clear();
         GC.Collect(2);
         Viewport.Children.Add(gridLines);
         Viewport.Children.Add(coordinateSystem);
@@ -559,38 +675,76 @@ public partial class MainWindow : Window
                                && _percolationBoundaryPores != null;
 
         int len = _currentLine.Count();
-        Point3DCollection? materialEdges = showPercolation ? new Point3DCollection() : null;
+        int side = (int)Math.Round(Math.Cbrt(len));
+        HashSet<(int, int, int, int, int, int)>? uniqueEdges =
+            showPercolation ? new HashSet<(int, int, int, int, int, int)>() : null;
 
-        for (int i = 0; i < len; i++)
+        
+
+        var deferredTransparent = showPercolation
+            ? new List<(Cube cube, Color color, double opacity)>()
+            : null;
+
+        
+
+        for (int idx = 0; idx < len; idx++)
         {
-            var current = _currentLine[i];
+            var current = _currentLine[idx];
 
             if (current.IsEmpty)
             {
                 if (!showPercolation) continue;
                 if (!_percolationBoundaryPores!.Contains(current)) continue;
 
-                AddCubeVisual(current, Colors.DodgerBlue, 1.0);
+                (Color color, double opacity) = ResolveBoundaryPoreAppearance(current);
+                if (opacity >= 1.0)
+                {
+                    AddCubeVisual(current, color, opacity, current);
+                    
+                }
+                else
+                {
+                    deferredTransparent!.Add((current, color, opacity));
+                    
+                }
                 continue;
             }
 
             if (showPercolation)
             {
-                AddCubeEdges(materialEdges!, current);
+                int i = idx / (side * side);
+                int j = (idx / side) % side;
+                int k = idx % side;
+                CollectOuterFaceEdges(uniqueEdges!, i, j, k, side);
                 continue;
             }
 
-            Color color = Colors.Red;
+            Color cubeColor = Colors.Red;
             if (useComponentColors && _cubeColorMap!.TryGetValue(current, out var mapped))
             {
-                color = mapped;
+                cubeColor = mapped;
             }
 
-            AddCubeVisual(current, color, 1.0);
+            AddCubeVisual(current, cubeColor, 1.0);
         }
 
-        if (showPercolation && materialEdges!.Count > 0)
+        Point3DCollection? materialEdges = null;
+        if (showPercolation && uniqueEdges!.Count > 0)
         {
+            var c000 = _currentLine[0];
+            double half = c000.SideLength * 0.5;
+            double step = c000.SideLength;
+            double baseX = c000.CentralPoint.X - half;
+            double baseY = c000.CentralPoint.Y - half;
+            double baseZ = c000.CentralPoint.Z - half;
+
+            materialEdges = new Point3DCollection(uniqueEdges.Count * 2);
+            foreach (var e in uniqueEdges)
+            {
+                materialEdges.Add(new Point3D(baseX + e.Item1 * step, baseY + e.Item2 * step, baseZ + e.Item3 * step));
+                materialEdges.Add(new Point3D(baseX + e.Item4 * step, baseY + e.Item5 * step, baseZ + e.Item6 * step));
+            }
+
             var wire = new LinesVisual3D
             {
                 Points = materialEdges,
@@ -599,41 +753,133 @@ public partial class MainWindow : Window
             };
             Viewport.Children.Add(wire);
         }
+
+        if (deferredTransparent != null)
+        {
+            foreach (var (cube, color, opacity) in deferredTransparent)
+            {
+                AddCubeVisual(cube, color, opacity, cube);
+            }
+        }
+
     }
 
-    private static void AddCubeEdges(Point3DCollection points, Cube cube)
+    private (Color color, double opacity) ResolveBoundaryPoreAppearance(Cube cube)
     {
-        double s = cube.SideLength * 0.5;
-        double cx = cube.CentralPoint.X;
-        double cy = cube.CentralPoint.Y;
-        double cz = cube.CentralPoint.Z;
+        if (_selectedBoundaryPore == null)
+        {
+            return (Colors.LimeGreen, 1.0);
+        }
 
-        var p000 = new Point3D(cx - s, cy - s, cz - s);
-        var p100 = new Point3D(cx + s, cy - s, cz - s);
-        var p010 = new Point3D(cx - s, cy + s, cz - s);
-        var p110 = new Point3D(cx + s, cy + s, cz - s);
-        var p001 = new Point3D(cx - s, cy - s, cz + s);
-        var p101 = new Point3D(cx + s, cy - s, cz + s);
-        var p011 = new Point3D(cx - s, cy + s, cz + s);
-        var p111 = new Point3D(cx + s, cy + s, cz + s);
+        if (ReferenceEquals(cube, _selectedBoundaryPore))
+        {
+            return (Colors.LimeGreen, 1.0);
+        }
 
-        points.Add(p000); points.Add(p100);
-        points.Add(p100); points.Add(p110);
-        points.Add(p110); points.Add(p010);
-        points.Add(p010); points.Add(p000);
+        if (_endToEndPeersByCube != null
+            && _endToEndPeersByCube.TryGetValue(_selectedBoundaryPore, out var endToEndPeers)
+            && endToEndPeers.Contains(cube))
+        {
+            return (Colors.DodgerBlue, 1.0);
+        }
 
-        points.Add(p001); points.Add(p101);
-        points.Add(p101); points.Add(p111);
-        points.Add(p111); points.Add(p011);
-        points.Add(p011); points.Add(p001);
+        if (_partialPeersByCube != null
+            && _partialPeersByCube.TryGetValue(_selectedBoundaryPore, out var partialPeers)
+            && partialPeers.Contains(cube))
+        {
+            return (Colors.Gold, 1.0);
+        }
 
-        points.Add(p000); points.Add(p001);
-        points.Add(p100); points.Add(p101);
-        points.Add(p110); points.Add(p111);
-        points.Add(p010); points.Add(p011);
+        return (Colors.LightGray, 1.0);
     }
 
-    private void AddCubeVisual(Cube current, Color color, double opacity)
+    private void CollectOuterFaceEdges(
+        HashSet<(int, int, int, int, int, int)> set,
+        int i, int j, int k, int side)
+    {
+        bool nXm = IsMaterialNeighbor(i - 1, j, k, side);
+        bool nXp = IsMaterialNeighbor(i + 1, j, k, side);
+        bool nYm = IsMaterialNeighbor(i, j - 1, k, side);
+        bool nYp = IsMaterialNeighbor(i, j + 1, k, side);
+        bool nZm = IsMaterialNeighbor(i, j, k - 1, side);
+        bool nZp = IsMaterialNeighbor(i, j, k + 1, side);
+
+        
+
+        int x0 = i, x1 = i + 1;
+        int y0 = j, y1 = j + 1;
+        int z0 = k, z1 = k + 1;
+
+        if (!nXm)
+        {
+            AddEdge(set, x0, y0, z0, x0, y1, z0);
+            AddEdge(set, x0, y1, z0, x0, y1, z1);
+            AddEdge(set, x0, y1, z1, x0, y0, z1);
+            AddEdge(set, x0, y0, z1, x0, y0, z0);
+        }
+        if (!nXp)
+        {
+            AddEdge(set, x1, y0, z0, x1, y1, z0);
+            AddEdge(set, x1, y1, z0, x1, y1, z1);
+            AddEdge(set, x1, y1, z1, x1, y0, z1);
+            AddEdge(set, x1, y0, z1, x1, y0, z0);
+        }
+        if (!nYm)
+        {
+            AddEdge(set, x0, y0, z0, x1, y0, z0);
+            AddEdge(set, x1, y0, z0, x1, y0, z1);
+            AddEdge(set, x1, y0, z1, x0, y0, z1);
+            AddEdge(set, x0, y0, z1, x0, y0, z0);
+        }
+        if (!nYp)
+        {
+            AddEdge(set, x0, y1, z0, x1, y1, z0);
+            AddEdge(set, x1, y1, z0, x1, y1, z1);
+            AddEdge(set, x1, y1, z1, x0, y1, z1);
+            AddEdge(set, x0, y1, z1, x0, y1, z0);
+        }
+        if (!nZm)
+        {
+            AddEdge(set, x0, y0, z0, x1, y0, z0);
+            AddEdge(set, x1, y0, z0, x1, y1, z0);
+            AddEdge(set, x1, y1, z0, x0, y1, z0);
+            AddEdge(set, x0, y1, z0, x0, y0, z0);
+        }
+        if (!nZp)
+        {
+            AddEdge(set, x0, y0, z1, x1, y0, z1);
+            AddEdge(set, x1, y0, z1, x1, y1, z1);
+            AddEdge(set, x1, y1, z1, x0, y1, z1);
+            AddEdge(set, x0, y1, z1, x0, y0, z1);
+        }
+    }
+
+    private bool IsMaterialNeighbor(int i, int j, int k, int side)
+    {
+        if (i < 0 || j < 0 || k < 0) return false;
+        if (i >= side || j >= side || k >= side) return false;
+        int idx = i * side * side + j * side + k;
+        return !_currentLine![idx].IsEmpty;
+    }
+
+    private static void AddEdge(
+        HashSet<(int, int, int, int, int, int)> set,
+        int x1, int y1, int z1,
+        int x2, int y2, int z2)
+    {
+        bool firstSmaller =
+            x1 < x2 || (x1 == x2 && (y1 < y2 || (y1 == y2 && z1 <= z2)));
+        if (firstSmaller)
+        {
+            set.Add((x1, y1, z1, x2, y2, z2));
+        }
+        else
+        {
+            set.Add((x2, y2, z2, x1, y1, z1));
+        }
+    }
+
+    private void AddCubeVisual(Cube current, Color color, double opacity, Cube? mapTo = null)
     {
         var brush = new SolidColorBrush(color) { Opacity = opacity };
         var box = new BoxVisual3D()
@@ -650,5 +896,9 @@ public partial class MainWindow : Window
             Material = MaterialHelper.CreateMaterial(brush)
         };
         Viewport.Children.Add(box);
+        if (mapTo != null)
+        {
+            _visualToCube[box] = mapTo;
+        }
     }
 }

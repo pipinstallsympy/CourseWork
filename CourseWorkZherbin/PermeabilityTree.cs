@@ -125,15 +125,20 @@ public class PermeabilityTree
                 int dx = (Math.Abs(c1.X - c2.X) < 1e-9) ? 1 : 0;
                 int dy = (Math.Abs(c1.Y - c2.Y) < 1e-9) ? 1 : 0;
                 int dz = (Math.Abs(c1.Z - c2.Z) < 1e-9) ? 1 : 0;
-                
-                if ((dx + dy + dz) == 2) continue;
 
                 double checkLength = fullSideLength - c1.SideLength;
                 bool endToEnd =
                     Math.Abs(Math.Abs(c1.X - c2.X) - checkLength) < 1e-9 ||
                     Math.Abs(Math.Abs(c1.Y - c2.Y) - checkLength) < 1e-9 ||
                     Math.Abs(Math.Abs(c1.Z - c2.Z) - checkLength) < 1e-9;
-                
+
+                if ((dx + dy + dz) == 2)
+                {
+                    if (endToEnd)
+                        AddPair(EndToEndPermeability, edgeNodes[i], edgeNodes[j]);
+                    continue;
+                }
+
                 if (endToEnd)
                     AddPair(EndToEndPermeability, edgeNodes[i], edgeNodes[j]);
                 else
