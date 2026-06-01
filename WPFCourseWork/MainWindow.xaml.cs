@@ -32,33 +32,6 @@ public partial class MainWindow : Window
     private Dictionary<Cube, HashSet<Cube>>? _endToEndPeersByCube;
     private readonly Dictionary<Visual3D, Cube> _visualToCube = new();
 
-    // #region agent log
-    private const string DebugLogPath = @"D:\labs\c#\CourseWorkZherbin\debug-fc019b.log";
-    private static int _debugFaceCallCounter = 0;
-    private static int _debugRunId = 0;
-
-    private static void DebugLog(string hypothesisId, string location, string message, object? data = null)
-    {
-        try
-        {
-            var payload = new Dictionary<string, object?>
-            {
-                ["sessionId"] = "fc019b",
-                ["runId"] = $"run{_debugRunId}",
-                ["hypothesisId"] = hypothesisId,
-                ["id"] = $"log_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{Guid.NewGuid().ToString("N").Substring(0, 6)}",
-                ["timestamp"] = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                ["location"] = location,
-                ["message"] = message,
-                ["data"] = data
-            };
-            string line = System.Text.Json.JsonSerializer.Serialize(payload);
-            System.IO.File.AppendAllText(DebugLogPath, line + "\n");
-        }
-        catch { }
-    }
-    // #endregion
-
     public MainWindow()
     {
         InitializeComponent();
@@ -384,29 +357,6 @@ public partial class MainWindow : Window
                 if (!ReferenceEquals(_selectedBoundaryPore, cube))
                 {
                     _selectedBoundaryPore = cube;
-                    // #region agent log
-                    var endToEndList = (_endToEndPeersByCube != null
-                                        && _endToEndPeersByCube.TryGetValue(cube, out var eList))
-                        ? eList.Select(c => new { c.X, c.Y, c.Z }).ToList()
-                        : new List<dynamic>().Select(_ => new { X = 0.0, Y = 0.0, Z = 0.0 }).ToList();
-                    var partialList = (_partialPeersByCube != null
-                                       && _partialPeersByCube.TryGetValue(cube, out var pList))
-                        ? pList.Select(c => new { c.X, c.Y, c.Z }).ToList()
-                        : new List<dynamic>().Select(_ => new { X = 0.0, Y = 0.0, Z = 0.0 }).ToList();
-
-                    DebugLog("H7,H8,H9", "MainWindow.xaml.cs:OnViewport3DClick",
-                        "Pore selected",
-                        new
-                        {
-                            selected = new { cube.X, cube.Y, cube.Z },
-                            inEndToEndDict = _endToEndPeersByCube?.ContainsKey(cube) ?? false,
-                            inPartialDict = _partialPeersByCube?.ContainsKey(cube) ?? false,
-                            endToEndPeerCount = endToEndList.Count,
-                            endToEndPeers = endToEndList,
-                            partialPeerCount = partialList.Count,
-                            partialPeers = partialList
-                        });
-                    // #endregion
                     RedrawCubes();
                 }
                 e.Handled = true;
