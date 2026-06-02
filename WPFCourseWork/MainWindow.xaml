@@ -224,17 +224,6 @@
                                  Checked="OnPercolationDisplayModeChanged"
                                  Unchecked="OnPercolationDisplayModeChanged"/>
 
-                    <CheckBox x:Name="ShowEndToEndConnectionsCheckBox"
-                              Content="Показать линии сквозных связей"
-                              Margin="0,8,0,0"
-                              Checked="OnPercolationConnectionLinesChanged"
-                              Unchecked="OnPercolationConnectionLinesChanged"/>
-                    <CheckBox x:Name="ShowPartialConnectionsCheckBox"
-                              Content="Показать линии частичных связей"
-                              Margin="0,4,0,0"
-                              Checked="OnPercolationConnectionLinesChanged"
-                              Unchecked="OnPercolationConnectionLinesChanged"/>
-
                     <Rectangle Height="15"/>
 
                     <TextBlock x:Name="PercolationStatsPoreCount" Text="Кол-во пор: -"/>

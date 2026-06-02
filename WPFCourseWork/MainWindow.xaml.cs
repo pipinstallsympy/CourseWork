@@ -37,9 +37,7 @@ public partial class MainWindow : Window
         && MainSideTabControl.SelectedItem == PercolationTabItem;
 
     private const int CoherencyPartitionWarningThreshold = 48;
-    private const int MaxPercolationLinesToDraw = 500;
     private bool _coherencyCalculationInProgress;
-    private bool _updatingPercolationLinesCheckBox;
 
     public MainWindow()
     {
@@ -480,16 +478,6 @@ public partial class MainWindow : Window
         _partialPeersByCube = null;
         _endToEndPeersByCube = null;
         _selectedBoundaryPore = null;
-        _updatingPercolationLinesCheckBox = true;
-        try
-        {
-            ShowEndToEndConnectionsCheckBox.IsChecked = false;
-            ShowPartialConnectionsCheckBox.IsChecked = false;
-        }
-        finally
-        {
-            _updatingPercolationLinesCheckBox = false;
-        }
         UpdatePercolationTreeStats();
 
         if (_currentLine != null)
@@ -583,45 +571,6 @@ public partial class MainWindow : Window
     {
         if (_percolationAllTreePores == null || _percolationEdgePores == null) return;
         _selectedBoundaryPore = null;
-        if (_currentLine != null)
-            RedrawCubes();
-    }
-
-    private void OnPercolationConnectionLinesChanged(object sender, RoutedEventArgs e)
-    {
-        if (_updatingPercolationLinesCheckBox) return;
-        if (_percolationAllTreePores == null) return;
-
-        if (sender is CheckBox { IsChecked: true } cb
-            && _permeabilityTreeList != null
-            && _selectedPercolationTreeIndex >= 0
-            && _selectedPercolationTreeIndex < _permeabilityTreeList.TreeList.Count)
-        {
-            var tree = _permeabilityTreeList.TreeList[_selectedPercolationTreeIndex];
-            int linesToAdd = cb == ShowEndToEndConnectionsCheckBox
-                ? tree.EndToEndPairCount
-                : tree.PartialPairCount;
-            if (linesToAdd > MaxPercolationLinesToDraw)
-            {
-                _updatingPercolationLinesCheckBox = true;
-                try
-                {
-                    cb.IsChecked = false;
-                }
-                finally
-                {
-                    _updatingPercolationLinesCheckBox = false;
-                }
-
-                MessageBox.Show(
-                    $"Слишком много связей ({linesToAdd}). Используйте клик по поре или уменьшите сетку.",
-                    "Перколяция",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
-                return;
-            }
-        }
-
         if (_currentLine != null)
             RedrawCubes();
     }
@@ -1047,36 +996,7 @@ public partial class MainWindow : Window
 
     private void AddPercolationConnectionLines()
     {
-        if (_permeabilityTreeList == null
-            || _selectedPercolationTreeIndex < 0
-            || _selectedPercolationTreeIndex >= _permeabilityTreeList.TreeList.Count)
-        {
-            return;
-        }
-
-        var tree = _permeabilityTreeList.TreeList[_selectedPercolationTreeIndex];
-        bool showAllEndToEnd = ShowEndToEndConnectionsCheckBox.IsChecked == true;
-        bool showAllPartial = ShowPartialConnectionsCheckBox.IsChecked == true;
-
-        if (showAllEndToEnd)
-        {
-            var endToEndLines = HelixSceneBuilder.BuildConnectionLines(
-                PermeabilityTree.EnumerateUniquePairs(tree.EndToEndPermeability),
-                Colors.DodgerBlue);
-            if (endToEndLines != null)
-                AddDynamicSceneItem(endToEndLines);
-        }
-
-        if (showAllPartial)
-        {
-            var partialLines = HelixSceneBuilder.BuildConnectionLines(
-                PermeabilityTree.EnumerateUniquePairs(tree.PartialPermeability),
-                Colors.Gold);
-            if (partialLines != null)
-                AddDynamicSceneItem(partialLines);
-        }
-
-        if (!showAllEndToEnd && !showAllPartial && _selectedBoundaryPore != null)
+        if (_selectedBoundaryPore != null)
             AddSelectedPoreConnectionLines();
     }
 
