@@ -179,6 +179,20 @@
                               Margin="0,4,0,0"
                               SelectionChanged="OnPercolationTreeSelectionChanged"/>
 
+                    <Rectangle Height="10"/>
+
+                    <RadioButton x:Name="ShowFullPercolationTreeRadio"
+                                 Content="Показать всё дерево"
+                                 IsChecked="True"
+                                 Margin="0,4,0,0"
+                                 Checked="OnPercolationDisplayModeChanged"
+                                 Unchecked="OnPercolationDisplayModeChanged"/>
+                    <RadioButton x:Name="ShowBoundaryPercolationPoresRadio"
+                                 Content="Только пограничные поры"
+                                 Margin="0,4,0,0"
+                                 Checked="OnPercolationDisplayModeChanged"
+                                 Unchecked="OnPercolationDisplayModeChanged"/>
+
                     <Rectangle Height="15"/>
 
                     <TextBlock x:Name="PercolationStatsPoreCount" Text="Кол-во пор: -"/>

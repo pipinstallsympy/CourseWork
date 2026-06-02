@@ -23,7 +23,8 @@ public partial class MainWindow : Window
     private CubeLine? _currentLine;
     private Dictionary<Cube, Color>? _cubeColorMap;
     private PermeabilityTreeList? _permeabilityTreeList;
-    private HashSet<Cube>? _percolationBoundaryPores;
+    private HashSet<Cube>? _percolationAllTreePores;
+    private HashSet<Cube>? _percolationEdgePores;
     private Cube? _selectedBoundaryPore;
     private Dictionary<Cube, HashSet<Cube>>? _partialPeersByCube;
     private Dictionary<Cube, HashSet<Cube>>? _endToEndPeersByCube;
@@ -331,7 +332,8 @@ public partial class MainWindow : Window
         StatsCoherencyCount.Text = "Связных компонент: -";
 
         _permeabilityTreeList = null;
-        _percolationBoundaryPores = null;
+        _percolationAllTreePores = null;
+        _percolationEdgePores = null;
         _partialPeersByCube = null;
         _endToEndPeersByCube = null;
         _selectedBoundaryPore = null;
@@ -471,7 +473,8 @@ public partial class MainWindow : Window
         }
 
         _selectedPercolationTreeIndex = -1;
-        _percolationBoundaryPores = null;
+        _percolationAllTreePores = null;
+        _percolationEdgePores = null;
         _partialPeersByCube = null;
         _endToEndPeersByCube = null;
         _selectedBoundaryPore = null;
@@ -541,15 +544,34 @@ public partial class MainWindow : Window
             return;
         }
 
-        var dict = new PermeabilityDictionary(
-            _permeabilityTreeList.TreeList[_selectedPercolationTreeIndex]);
+        var tree = _permeabilityTreeList.TreeList[_selectedPercolationTreeIndex];
 
-        (_percolationBoundaryPores, _partialPeersByCube, _endToEndPeersByCube)
-            = BuildPercolationIndex(dict);
+        _percolationAllTreePores = new HashSet<Cube>();
+        _percolationEdgePores = new HashSet<Cube>();
+        tree.CollectAllPoresInSubtree(_percolationAllTreePores);
+        tree.CollectBoundaryPores(_percolationEdgePores);
+
+        var dict = new PermeabilityDictionary(tree);
+        (_partialPeersByCube, _endToEndPeersByCube) = BuildPercolationIndex(dict);
         _selectedBoundaryPore = null;
 
         if (IsPercolationViewActive && _currentLine != null)
             RedrawCubes();
+    }
+
+    private void OnPercolationDisplayModeChanged(object sender, RoutedEventArgs e)
+    {
+        if (_percolationAllTreePores == null || _percolationEdgePores == null) return;
+        _selectedBoundaryPore = null;
+        if (_currentLine != null)
+            RedrawCubes();
+    }
+
+    private HashSet<Cube>? GetVisiblePercolationPores()
+    {
+        if (ShowFullPercolationTreeRadio.IsChecked == true)
+            return _percolationAllTreePores;
+        return _percolationEdgePores;
     }
 
     private void OnPercolationTreeSelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -566,7 +588,8 @@ public partial class MainWindow : Window
     private void OnViewport3DClick(object sender, MouseButtonEventArgs e)
     {
         if (!IsPercolationViewActive) return;
-        if (_percolationBoundaryPores == null) return;
+        var visiblePores = GetVisiblePercolationPores();
+        if (visiblePores == null) return;
 
         var pt = e.GetPosition(Viewport);
         var hits = Viewport.FindHits(pt);
@@ -574,6 +597,7 @@ public partial class MainWindow : Window
         {
             if (hit.ModelHit is MeshGeometryModel3D { Tag: Cube cube })
             {
+                if (!visiblePores.Contains(cube)) continue;
                 if (!ReferenceEquals(_selectedBoundaryPore, cube))
                 {
                     _selectedBoundaryPore = cube;
@@ -591,30 +615,26 @@ public partial class MainWindow : Window
         }
     }
 
-    private static (HashSet<Cube> boundary,
-                    Dictionary<Cube, HashSet<Cube>> partialPeers,
+    private static (Dictionary<Cube, HashSet<Cube>> partialPeers,
                     Dictionary<Cube, HashSet<Cube>> endToEndPeers)
         BuildPercolationIndex(PermeabilityDictionary dict)
     {
-        var boundary = new HashSet<Cube>();
         var partial = new Dictionary<Cube, HashSet<Cube>>();
         var endToEnd = new Dictionary<Cube, HashSet<Cube>>();
 
-        AccumulatePeers(dict.PartialPermeability, partial, boundary);
-        AccumulatePeers(dict.EndToEndPermeability, endToEnd, boundary);
+        AccumulatePeers(dict.PartialPermeability, partial);
+        AccumulatePeers(dict.EndToEndPermeability, endToEnd);
 
-        return (boundary, partial, endToEnd);
+        return (partial, endToEnd);
     }
 
     private static void AccumulatePeers(
         Dictionary<TreeNode<Cube>, List<TreeNode<Cube>>> source,
-        Dictionary<Cube, HashSet<Cube>> peers,
-        HashSet<Cube> boundary)
+        Dictionary<Cube, HashSet<Cube>> peers)
     {
         foreach (var kvp in source)
         {
             Cube a = kvp.Key.Value;
-            boundary.Add(a);
             if (!peers.TryGetValue(a, out var listA))
             {
                 listA = new HashSet<Cube>();
@@ -623,7 +643,6 @@ public partial class MainWindow : Window
             foreach (var node in kvp.Value)
             {
                 Cube b = node.Value;
-                boundary.Add(b);
                 listA.Add(b);
                 if (!peers.TryGetValue(b, out var listB))
                 {
@@ -881,8 +900,9 @@ public partial class MainWindow : Window
                                   && _cubeColorMap != null
                                   && _cubeColorMap.Count > 0;
 
+        var visiblePercolationPores = GetVisiblePercolationPores();
         bool showPercolation = IsPercolationViewActive
-                               && _percolationBoundaryPores != null;
+                               && visiblePercolationPores != null;
 
         int len = _currentLine.Count();
         int side = (int)Math.Round(Math.Cbrt(len));
@@ -900,7 +920,7 @@ public partial class MainWindow : Window
             if (current.IsEmpty)
             {
                 if (!showPercolation) continue;
-                if (!_percolationBoundaryPores!.Contains(current)) continue;
+                if (!visiblePercolationPores!.Contains(current)) continue;
 
                 (Color color, double opacity) = ResolveBoundaryPoreAppearance(current);
                 if (opacity >= 1.0)

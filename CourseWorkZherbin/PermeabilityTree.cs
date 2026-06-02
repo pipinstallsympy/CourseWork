@@ -117,6 +117,25 @@ public class PermeabilityTree
         return count;
     }
 
+    public void CollectAllPoresInSubtree(HashSet<Cube> target)
+    {
+        var stack = new Stack<TreeNode<Cube>>();
+        stack.Push(startNode);
+        while (stack.Count > 0)
+        {
+            var node = stack.Pop();
+            if (node.Value.IsEmpty) target.Add(node.Value);
+            foreach (var child in node.Children)
+                stack.Push(child);
+        }
+    }
+
+    public void CollectBoundaryPores(HashSet<Cube> target)
+    {
+        foreach (var node in edgeNodes)
+            target.Add(node.Value);
+    }
+
     public int TreeDepth => ComputeTreeDepth(startNode);
 
     private static int ComputeTreeDepth(TreeNode<Cube> node)
