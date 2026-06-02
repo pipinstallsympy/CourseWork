@@ -24,6 +24,20 @@ public class CubeLine : IDisposable
         }
     }
 
+    public CubeLine(CubeLine other)
+    {
+        ArgumentNullException.ThrowIfNull(other);
+        Line = new List<Cube>(other.Line.Count);
+        foreach (Cube c in other.Line)
+        {
+            Point p = c.CentralPoint;
+            Cube copy = new Cube(new Point(p.X, p.Y, p.Z), c.SideLength)
+            {
+                IsEmpty = c.IsEmpty
+            };
+            Line.Add(copy);
+        }
+    }
     public CubeGrid GenerateGridFromLine()
     {
         CubeGrid grid = new CubeGrid();
