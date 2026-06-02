@@ -99,8 +99,10 @@ public class PermeabilityTree
 
         if (IsOnGridBoundary(startNode.Value)) edgeNodes.Add(startNode);
         CreateEdgeNodes(startNode);
-        CreateDictionaries(fullSideLength);
+        CreateDictionaries();
     }
+
+    private enum SampleFace { XMin, XMax, YMin, YMax, ZMin, ZMax }
 
     public int BoundaryPoreCount => edgeNodes.Count;
 
@@ -220,45 +222,72 @@ public class PermeabilityTree
         }
     }
 
-    private bool IsOnGridBoundary(Cube c)
+    private bool IsOnGridBoundary(Cube c) => GetTouchingFaces(c).Count > 0;
+
+    private HashSet<SampleFace> GetTouchingFaces(Cube c)
     {
         double half = c.SideLength * 0.5;
         const double eps = 1e-9;
-        return Math.Abs(c.X - (_minX + half)) < eps || Math.Abs(c.X - (_maxX - half)) < eps
-            || Math.Abs(c.Y - (_minY + half)) < eps || Math.Abs(c.Y - (_maxY - half)) < eps
-            || Math.Abs(c.Z - (_minZ + half)) < eps || Math.Abs(c.Z - (_maxZ - half)) < eps;
+        var faces = new HashSet<SampleFace>();
+        if (Math.Abs(c.X - (_minX + half)) < eps) faces.Add(SampleFace.XMin);
+        if (Math.Abs(c.X - (_maxX - half)) < eps) faces.Add(SampleFace.XMax);
+        if (Math.Abs(c.Y - (_minY + half)) < eps) faces.Add(SampleFace.YMin);
+        if (Math.Abs(c.Y - (_maxY - half)) < eps) faces.Add(SampleFace.YMax);
+        if (Math.Abs(c.Z - (_minZ + half)) < eps) faces.Add(SampleFace.ZMin);
+        if (Math.Abs(c.Z - (_maxZ - half)) < eps) faces.Add(SampleFace.ZMax);
+        return faces;
     }
 
-    private void CreateDictionaries(double fullSideLength)
+    private static bool AreOpposite(SampleFace a, SampleFace b) =>
+        (a == SampleFace.XMin && b == SampleFace.XMax) || (a == SampleFace.XMax && b == SampleFace.XMin)
+        || (a == SampleFace.YMin && b == SampleFace.YMax) || (a == SampleFace.YMax && b == SampleFace.YMin)
+        || (a == SampleFace.ZMin && b == SampleFace.ZMax) || (a == SampleFace.ZMax && b == SampleFace.ZMin);
+
+    private static bool AreAdjacent(SampleFace a, SampleFace b)
     {
-        
+        if (a == b) return false;
+        return a switch
+        {
+            SampleFace.XMin or SampleFace.XMax => b is SampleFace.YMin or SampleFace.YMax or SampleFace.ZMin or SampleFace.ZMax,
+            SampleFace.YMin or SampleFace.YMax => b is SampleFace.XMin or SampleFace.XMax or SampleFace.ZMin or SampleFace.ZMax,
+            SampleFace.ZMin or SampleFace.ZMax => b is SampleFace.XMin or SampleFace.XMax or SampleFace.YMin or SampleFace.YMax,
+            _ => false
+        };
+    }
+
+    private static bool HasOppositeFacePair(HashSet<SampleFace> f1, HashSet<SampleFace> f2)
+    {
+        foreach (var face1 in f1)
+        foreach (var face2 in f2)
+            if (AreOpposite(face1, face2)) return true;
+        return false;
+    }
+
+    private static bool HasAdjacentFacePair(HashSet<SampleFace> f1, HashSet<SampleFace> f2)
+    {
+        foreach (var face1 in f1)
+        foreach (var face2 in f2)
+            if (AreAdjacent(face1, face2)) return true;
+        return false;
+    }
+
+    private void CreateDictionaries()
+    {
         int count = edgeNodes.Count;
         for (int i = 0; i < count; i++)
         {
-            Cube c1 =  edgeNodes[i].Value;
+            var faces1 = GetTouchingFaces(edgeNodes[i].Value);
             for (int j = i + 1; j < count; j++)
             {
-                Cube c2 =  edgeNodes[j].Value;
-                int dx = (Math.Abs(c1.X - c2.X) < 1e-9) ? 1 : 0;
-                int dy = (Math.Abs(c1.Y - c2.Y) < 1e-9) ? 1 : 0;
-                int dz = (Math.Abs(c1.Z - c2.Z) < 1e-9) ? 1 : 0;
+                var faces2 = GetTouchingFaces(edgeNodes[j].Value);
 
-                double checkLength = fullSideLength - c1.SideLength;
-                bool endToEnd =
-                    Math.Abs(Math.Abs(c1.X - c2.X) - checkLength) < 1e-9 ||
-                    Math.Abs(Math.Abs(c1.Y - c2.Y) - checkLength) < 1e-9 ||
-                    Math.Abs(Math.Abs(c1.Z - c2.Z) - checkLength) < 1e-9;
-
-                if ((dx + dy + dz) == 2)
+                if (HasOppositeFacePair(faces1, faces2))
                 {
-                    if (endToEnd)
-                        AddPair(EndToEndPermeability, edgeNodes[i], edgeNodes[j]);
+                    AddPair(EndToEndPermeability, edgeNodes[i], edgeNodes[j]);
                     continue;
                 }
 
-                if (endToEnd)
-                    AddPair(EndToEndPermeability, edgeNodes[i], edgeNodes[j]);
-                else
+                if (HasAdjacentFacePair(faces1, faces2))
                     AddPair(PartialPermeability, edgeNodes[i], edgeNodes[j]);
             }
         }
