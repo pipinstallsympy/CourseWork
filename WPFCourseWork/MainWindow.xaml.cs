@@ -5,23 +5,20 @@ using System.Windows.Input;
 using System.Windows.Media;
 using CourseWorkZherbin;
 using Point = CourseWorkZherbin.Point;
-using HelixToolkit.Wpf;
-using System.Windows.Media.Media3D;
+using HelixToolkit.Wpf.SharpDX;
+using WPFCourseWork.Rendering;
 
 namespace WPFCourseWork;
 
 public partial class MainWindow : Window
 {
-    private static GridLinesVisual3D gridLines = new GridLinesVisual3D()
-    {
-        Width = 1000,     
-        Length = 1000,    
-        MinorDistance = 1,  
-        MajorDistance = 1,  
-        Thickness = 0.01,   
-    };
-    private static CoordinateSystemVisual3D coordinateSystem = new CoordinateSystemVisual3D();
-    private static List<TreeNode<Cube>> coherenceTreeList  = new List<TreeNode<Cube>>();
+    private static List<TreeNode<Cube>> coherenceTreeList = new List<TreeNode<Cube>>();
+
+    private readonly IEffectsManager _effectsManager = new DefaultEffectsManager();
+    private readonly IReadOnlyList<Element3D> _sceneLights = HelixSceneBuilder.CreateDefaultSceneLights();
+    private readonly IReadOnlyList<Element3D> _staticSceneItems;
+    private readonly IReadOnlyList<MeshGeometryModel3D> _originAxes = HelixSceneBuilder.CreateOriginUnitAxes();
+    private readonly List<Element3D> _dynamicSceneItems = new();
 
     private CubeLine? _currentLine;
     private Dictionary<Cube, Color>? _cubeColorMap;
@@ -30,13 +27,86 @@ public partial class MainWindow : Window
     private Cube? _selectedBoundaryPore;
     private Dictionary<Cube, HashSet<Cube>>? _partialPeersByCube;
     private Dictionary<Cube, HashSet<Cube>>? _endToEndPeersByCube;
-    private readonly Dictionary<Visual3D, Cube> _visualToCube = new();
 
     public MainWindow()
     {
         InitializeComponent();
+        Viewport.EffectsManager = _effectsManager;
+        ConfigureViewportChrome();
+        ConfigureTopDownCamera();
+        _staticSceneItems = BuildStaticSceneItems();
+        InitializeStaticScene();
+        BringOriginAxesToFront();
         MethodsPanel.SelectionChanged += OnSelectionChanged;
         Viewport.PreviewMouseLeftButtonDown += OnViewport3DClick;
+        Viewport.Loaded += (_, _) => ConfigureTopDownCamera();
+    }
+
+    private void ConfigureViewportChrome()
+    {
+        Viewport.ShowViewCube = false;
+        Viewport.ShowCoordinateSystem = true;
+        Viewport.CoordinateSystemHorizontalPosition = 0.82;
+        Viewport.CoordinateSystemVerticalPosition = -0.82;
+        Viewport.CoordinateSystemSize = 120;
+    }
+
+    /// <summary>
+    /// Top-down view along -Y onto the X–Z grid and origin axes at (0, 0, 0).
+    /// </summary>
+    private void ConfigureTopDownCamera()
+    {
+        const double distance = 3.5;
+        Viewport.Camera = new PerspectiveCamera
+        {
+            Position = new System.Windows.Media.Media3D.Point3D(0, distance, 0),
+            LookDirection = new System.Windows.Media.Media3D.Vector3D(0, -distance, 0),
+            UpDirection = new System.Windows.Media.Media3D.Vector3D(0, 0, -1),
+            FieldOfView = 50
+        };
+    }
+
+    private IReadOnlyList<Element3D> BuildStaticSceneItems()
+    {
+        var items = new List<Element3D>();
+        items.AddRange(_sceneLights);
+        items.Add(HelixSceneBuilder.CreateZxPlaneGrid());
+        return items;
+    }
+
+    private void BringOriginAxesToFront()
+    {
+        foreach (var axis in _originAxes)
+        {
+            if (Viewport.Items.Contains(axis))
+            {
+                Viewport.Items.Remove(axis);
+            }
+            Viewport.Items.Add(axis);
+        }
+    }
+
+    private void InitializeStaticScene()
+    {
+        foreach (var item in _staticSceneItems)
+        {
+            Viewport.Items.Add(item);
+        }
+    }
+
+    private void ClearDynamicSceneItems()
+    {
+        foreach (var item in _dynamicSceneItems)
+        {
+            Viewport.Items.Remove(item);
+        }
+        _dynamicSceneItems.Clear();
+    }
+
+    private void AddDynamicSceneItem(Element3D item)
+    {
+        Viewport.Items.Add(item);
+        _dynamicSceneItems.Add(item);
     }
 
     private void OnSelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -101,9 +171,9 @@ public partial class MainWindow : Window
             UpdateNodeStats(liney);
             StoreGeneratedLine(liney);
             RedrawCubes();
-        }        
+        }
     }
-    
+
     private void CalculationsCube(int partition, string? poreChoice, double poresValue)
     {
         if (!double.TryParse(CenterX.Text, out double centerX))
@@ -126,7 +196,7 @@ public partial class MainWindow : Window
             MessageBox.Show("Сторона куба задана наверно");
             return;
         }
-        
+
         Cube startCube;
         CubeGrid griddy;
         CubeLine? liney;
@@ -135,19 +205,19 @@ public partial class MainWindow : Window
             startCube = new Cube(new Point(centerX, centerY, centerZ), sideLength);
             using (griddy = new CubeGrid(startCube, partition))
             {
-                liney = griddy.GenerateLineFromGrid(); 
+                liney = griddy.GenerateLineFromGrid();
                 CreatePores(liney, poreChoice, poresValue);
                 UpdateNodeStats(liney);
                 StoreGeneratedLine(liney);
                 RedrawCubes();
             }
         }
-        catch(Exception e)
+        catch (Exception e)
         {
             MessageBox.Show(e.Message);
         }
     }
-    
+
     private void CalculationsPoints(int partition, string? poreChoice, double poresValue)
     {
         if (!double.TryParse(P1X.Text, out double p1X))
@@ -180,12 +250,12 @@ public partial class MainWindow : Window
             MessageBox.Show("Координаты заданы неверно");
             return;
         }
-        
+
         Point p1 = new Point(p1X, p1Y, p1Z);
         Point p2 = new Point(p2X, p2Y, p2Z);
         CubeGrid griddy;
         CubeLine? liney;
-        
+
         try
         {
             using (griddy = new CubeGrid(p1, p2, partition))
@@ -200,11 +270,8 @@ public partial class MainWindow : Window
         catch (Exception e)
         {
             MessageBox.Show(e.Message);
-            
         }
     }
-
-    
 
     private void RunTimedCalculation(Action calculation)
     {
@@ -220,7 +287,7 @@ public partial class MainWindow : Window
         int total = liney.Count();
         int pores = liney.PoreAmount();
         StatsMaterialCount.Text = $"Узлов материала: {total - pores}";
-        StatsPoreCount.Text     = $"Узлов пор: {pores}";
+        StatsPoreCount.Text = $"Узлов пор: {pores}";
     }
 
     private void CreatePores(CubeLine? liney, string? poreChoice, double poresValue)
@@ -349,10 +416,10 @@ public partial class MainWindow : Window
         if (_percolationBoundaryPores == null) return;
 
         var pt = e.GetPosition(Viewport);
-        var hits = Viewport3DHelper.FindHits(Viewport.Viewport, pt);
-        foreach (var h in hits)
+        var hits = Viewport.FindHits(pt);
+        foreach (var hit in hits)
         {
-            if (_visualToCube.TryGetValue(h.Visual, out var cube))
+            if (hit.ModelHit is MeshGeometryModel3D { Tag: Cube cube })
             {
                 if (!ReferenceEquals(_selectedBoundaryPore, cube))
                 {
@@ -593,12 +660,12 @@ public partial class MainWindow : Window
         double m = v - c;
 
         double r, g, b;
-        if (h < 60)        { r = c; g = x; b = 0; }
-        else if (h < 120)  { r = x; g = c; b = 0; }
-        else if (h < 180)  { r = 0; g = c; b = x; }
-        else if (h < 240)  { r = 0; g = x; b = c; }
-        else if (h < 300)  { r = x; g = 0; b = c; }
-        else               { r = c; g = 0; b = x; }
+        if (h < 60) { r = c; g = x; b = 0; }
+        else if (h < 120) { r = x; g = c; b = 0; }
+        else if (h < 180) { r = 0; g = c; b = x; }
+        else if (h < 240) { r = 0; g = x; b = c; }
+        else if (h < 300) { r = x; g = 0; b = c; }
+        else { r = c; g = 0; b = x; }
 
         return Color.FromRgb(
             (byte)Math.Round((r + m) * 255),
@@ -608,12 +675,7 @@ public partial class MainWindow : Window
 
     private void RedrawCubes()
     {
-        Viewport.Children.Clear();
-        _visualToCube.Clear();
-        GC.Collect(2);
-        Viewport.Children.Add(gridLines);
-        Viewport.Children.Add(coordinateSystem);
-        Viewport.Children.Add(new DefaultLights());
+        ClearDynamicSceneItems();
 
         if (_currentLine == null) return;
 
@@ -629,13 +691,9 @@ public partial class MainWindow : Window
         HashSet<(int, int, int, int, int, int)>? uniqueEdges =
             showPercolation ? new HashSet<(int, int, int, int, int, int)>() : null;
 
-        
-
         var deferredTransparent = showPercolation
             ? new List<(Cube cube, Color color, double opacity)>()
             : null;
-
-        
 
         for (int idx = 0; idx < len; idx++)
         {
@@ -649,13 +707,11 @@ public partial class MainWindow : Window
                 (Color color, double opacity) = ResolveBoundaryPoreAppearance(current);
                 if (opacity >= 1.0)
                 {
-                    AddCubeVisual(current, color, opacity, current);
-                    
+                    AddDynamicSceneItem(HelixSceneBuilder.BuildPoreMesh(current, color, opacity));
                 }
                 else
                 {
                     deferredTransparent!.Add((current, color, opacity));
-                    
                 }
                 continue;
             }
@@ -668,50 +724,34 @@ public partial class MainWindow : Window
                 CollectOuterFaceEdges(uniqueEdges!, i, j, k, side);
                 continue;
             }
-
-            Color cubeColor = Colors.Red;
-            if (useComponentColors && _cubeColorMap!.TryGetValue(current, out var mapped))
-            {
-                cubeColor = mapped;
-            }
-
-            AddCubeVisual(current, cubeColor, 1.0);
         }
 
-        Point3DCollection? materialEdges = null;
-        if (showPercolation && uniqueEdges!.Count > 0)
+        if (!showPercolation)
         {
-            var c000 = _currentLine[0];
-            double half = c000.SideLength * 0.5;
-            double step = c000.SideLength;
-            double baseX = c000.CentralPoint.X - half;
-            double baseY = c000.CentralPoint.Y - half;
-            double baseZ = c000.CentralPoint.Z - half;
-
-            materialEdges = new Point3DCollection(uniqueEdges.Count * 2);
-            foreach (var e in uniqueEdges)
+            foreach (var mesh in HelixSceneBuilder.BuildBatchedMaterialMeshes(
+                         _currentLine, useComponentColors, _cubeColorMap))
             {
-                materialEdges.Add(new Point3D(baseX + e.Item1 * step, baseY + e.Item2 * step, baseZ + e.Item3 * step));
-                materialEdges.Add(new Point3D(baseX + e.Item4 * step, baseY + e.Item5 * step, baseZ + e.Item6 * step));
+                AddDynamicSceneItem(mesh);
             }
-
-            var wire = new LinesVisual3D
+        }
+        else if (uniqueEdges!.Count > 0)
+        {
+            var wire = HelixSceneBuilder.BuildMaterialWireframe(uniqueEdges, _currentLine[0]);
+            if (wire != null)
             {
-                Points = materialEdges,
-                Color = Colors.DimGray,
-                Thickness = 1.0
-            };
-            Viewport.Children.Add(wire);
+                AddDynamicSceneItem(wire);
+            }
         }
 
         if (deferredTransparent != null)
         {
             foreach (var (cube, color, opacity) in deferredTransparent)
             {
-                AddCubeVisual(cube, color, opacity, cube);
+                AddDynamicSceneItem(HelixSceneBuilder.BuildPoreMesh(cube, color, opacity));
             }
         }
 
+        BringOriginAxesToFront();
     }
 
     private (Color color, double opacity) ResolveBoundaryPoreAppearance(Cube cube)
@@ -753,8 +793,6 @@ public partial class MainWindow : Window
         bool nYp = IsMaterialNeighbor(i, j + 1, k, side);
         bool nZm = IsMaterialNeighbor(i, j, k - 1, side);
         bool nZp = IsMaterialNeighbor(i, j, k + 1, side);
-
-        
 
         int x0 = i, x1 = i + 1;
         int y0 = j, y1 = j + 1;
@@ -826,29 +864,6 @@ public partial class MainWindow : Window
         else
         {
             set.Add((x2, y2, z2, x1, y1, z1));
-        }
-    }
-
-    private void AddCubeVisual(Cube current, Color color, double opacity, Cube? mapTo = null)
-    {
-        var brush = new SolidColorBrush(color) { Opacity = opacity };
-        var box = new BoxVisual3D()
-        {
-            Center = new Point3D()
-            {
-                X = current.CentralPoint.X,
-                Y = current.CentralPoint.Y,
-                Z = current.CentralPoint.Z
-            },
-            Width = current.SideLength,
-            Height = current.SideLength,
-            Length = current.SideLength,
-            Material = MaterialHelper.CreateMaterial(brush)
-        };
-        Viewport.Children.Add(box);
-        if (mapTo != null)
-        {
-            _visualToCube[box] = mapTo;
         }
     }
 }
