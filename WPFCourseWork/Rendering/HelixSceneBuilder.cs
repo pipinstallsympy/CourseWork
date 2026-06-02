@@ -173,6 +173,36 @@ public static class HelixSceneBuilder
         };
     }
 
+    public static LineGeometryModel3D? BuildConnectionLines(
+        IEnumerable<(Cube from, Cube to)> pairs,
+        WpfColor color,
+        double thickness = 2.0)
+    {
+        var pairList = pairs as IList<(Cube from, Cube to)> ?? pairs.ToList();
+        if (pairList.Count == 0) return null;
+
+        var positions = new Vector3Collection(pairList.Count * 2);
+        foreach (var (from, to) in pairList)
+        {
+            positions.Add(new Vector3(
+                (float)from.CentralPoint.X,
+                (float)from.CentralPoint.Y,
+                (float)from.CentralPoint.Z));
+            positions.Add(new Vector3(
+                (float)to.CentralPoint.X,
+                (float)to.CentralPoint.Y,
+                (float)to.CentralPoint.Z));
+        }
+
+        return new LineGeometryModel3D
+        {
+            Geometry = new LineGeometry3D { Positions = positions },
+            Color = color,
+            Thickness = thickness,
+            IsHitTestVisible = false
+        };
+    }
+
     public static MeshGeometryModel3D BuildPoreMesh(Cube cube, WpfColor color, double opacity)
     {
         var builder = new MeshBuilder();

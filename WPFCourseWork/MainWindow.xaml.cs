@@ -37,7 +37,9 @@ public partial class MainWindow : Window
         && MainSideTabControl.SelectedItem == PercolationTabItem;
 
     private const int CoherencyPartitionWarningThreshold = 48;
+    private const int MaxPercolationLinesToDraw = 500;
     private bool _coherencyCalculationInProgress;
+    private bool _updatingPercolationLinesCheckBox;
 
     public MainWindow()
     {
@@ -478,6 +480,16 @@ public partial class MainWindow : Window
         _partialPeersByCube = null;
         _endToEndPeersByCube = null;
         _selectedBoundaryPore = null;
+        _updatingPercolationLinesCheckBox = true;
+        try
+        {
+            ShowEndToEndConnectionsCheckBox.IsChecked = false;
+            ShowPartialConnectionsCheckBox.IsChecked = false;
+        }
+        finally
+        {
+            _updatingPercolationLinesCheckBox = false;
+        }
         UpdatePercolationTreeStats();
 
         if (_currentLine != null)
@@ -505,7 +517,7 @@ public partial class MainWindow : Window
             }
 
             for (int i = 0; i < _permeabilityTreeList.TreeList.Count; i++)
-                PercolationTreeSelector.Items.Add($"Дерево {i + 1}");
+                PercolationTreeSelector.Items.Add(_permeabilityTreeList.TreeList[i].FormatSelectorLabel(i));
 
             PercolationTreeSelector.SelectedIndex = 0;
             _selectedPercolationTreeIndex = 0;
@@ -525,14 +537,22 @@ public partial class MainWindow : Window
         {
             PercolationStatsPoreCount.Text = "Кол-во пор: -";
             PercolationStatsBoundaryPores.Text = "Кол-во пограничных пор: -";
-            PercolationStatsTreeDepth.Text = "Глубина дерева: -";
+            PercolationStatsEndToEnd.Text = "Пар сквозной перколяции: -";
+            PercolationStatsPartial.Text = "Пар частичной перколяции: -";
+            PercolationStatsHasThrough.Text = "Сквозная перколяция: -";
+            PercolationStatsTreeDepth.Text = "Глубина октодерева: -";
             return;
         }
 
         var tree = _permeabilityTreeList.TreeList[_selectedPercolationTreeIndex];
         PercolationStatsPoreCount.Text = $"Кол-во пор: {tree.CountPoresInSubtree()}";
         PercolationStatsBoundaryPores.Text = $"Кол-во пограничных пор: {tree.BoundaryPoreCount}";
-        PercolationStatsTreeDepth.Text = $"Глубина дерева: {tree.TreeDepth}";
+        PercolationStatsEndToEnd.Text = $"Пар сквозной перколяции: {tree.EndToEndPairCount}";
+        PercolationStatsPartial.Text = $"Пар частичной перколяции: {tree.PartialPairCount}";
+        PercolationStatsHasThrough.Text = tree.HasEndToEndPercolation
+            ? "Сквозная перколяция: да"
+            : "Сквозная перколяция: нет";
+        PercolationStatsTreeDepth.Text = $"Глубина октодерева: {tree.TreeDepth}";
     }
 
     private void ApplyPercolationView()
@@ -563,6 +583,45 @@ public partial class MainWindow : Window
     {
         if (_percolationAllTreePores == null || _percolationEdgePores == null) return;
         _selectedBoundaryPore = null;
+        if (_currentLine != null)
+            RedrawCubes();
+    }
+
+    private void OnPercolationConnectionLinesChanged(object sender, RoutedEventArgs e)
+    {
+        if (_updatingPercolationLinesCheckBox) return;
+        if (_percolationAllTreePores == null) return;
+
+        if (sender is CheckBox { IsChecked: true } cb
+            && _permeabilityTreeList != null
+            && _selectedPercolationTreeIndex >= 0
+            && _selectedPercolationTreeIndex < _permeabilityTreeList.TreeList.Count)
+        {
+            var tree = _permeabilityTreeList.TreeList[_selectedPercolationTreeIndex];
+            int linesToAdd = cb == ShowEndToEndConnectionsCheckBox
+                ? tree.EndToEndPairCount
+                : tree.PartialPairCount;
+            if (linesToAdd > MaxPercolationLinesToDraw)
+            {
+                _updatingPercolationLinesCheckBox = true;
+                try
+                {
+                    cb.IsChecked = false;
+                }
+                finally
+                {
+                    _updatingPercolationLinesCheckBox = false;
+                }
+
+                MessageBox.Show(
+                    $"Слишком много связей ({linesToAdd}). Используйте клик по поре или уменьшите сетку.",
+                    "Перколяция",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
+            }
+        }
+
         if (_currentLine != null)
             RedrawCubes();
     }
@@ -912,6 +971,9 @@ public partial class MainWindow : Window
         var deferredTransparent = showPercolation
             ? new List<(Cube cube, Color color, double opacity)>()
             : null;
+        var deferredOpaque = showPercolation
+            ? new List<(Cube cube, Color color, double opacity)>()
+            : null;
 
         for (int idx = 0; idx < len; idx++)
         {
@@ -925,7 +987,7 @@ public partial class MainWindow : Window
                 (Color color, double opacity) = ResolveBoundaryPoreAppearance(current);
                 if (opacity >= 1.0)
                 {
-                    AddDynamicSceneItem(HelixSceneBuilder.BuildPoreMesh(current, color, opacity));
+                    deferredOpaque!.Add((current, color, opacity));
                 }
                 else
                 {
@@ -961,6 +1023,9 @@ public partial class MainWindow : Window
             }
         }
 
+        if (showPercolation)
+            AddPercolationConnectionLines();
+
         if (deferredTransparent != null)
         {
             foreach (var (cube, color, opacity) in deferredTransparent)
@@ -969,14 +1034,88 @@ public partial class MainWindow : Window
             }
         }
 
+        if (deferredOpaque != null)
+        {
+            foreach (var (cube, color, opacity) in deferredOpaque)
+            {
+                AddDynamicSceneItem(HelixSceneBuilder.BuildPoreMesh(cube, color, opacity));
+            }
+        }
+
         BringOriginAxesToFront();
+    }
+
+    private void AddPercolationConnectionLines()
+    {
+        if (_permeabilityTreeList == null
+            || _selectedPercolationTreeIndex < 0
+            || _selectedPercolationTreeIndex >= _permeabilityTreeList.TreeList.Count)
+        {
+            return;
+        }
+
+        var tree = _permeabilityTreeList.TreeList[_selectedPercolationTreeIndex];
+        bool showAllEndToEnd = ShowEndToEndConnectionsCheckBox.IsChecked == true;
+        bool showAllPartial = ShowPartialConnectionsCheckBox.IsChecked == true;
+
+        if (showAllEndToEnd)
+        {
+            var endToEndLines = HelixSceneBuilder.BuildConnectionLines(
+                PermeabilityTree.EnumerateUniquePairs(tree.EndToEndPermeability),
+                Colors.DodgerBlue);
+            if (endToEndLines != null)
+                AddDynamicSceneItem(endToEndLines);
+        }
+
+        if (showAllPartial)
+        {
+            var partialLines = HelixSceneBuilder.BuildConnectionLines(
+                PermeabilityTree.EnumerateUniquePairs(tree.PartialPermeability),
+                Colors.Gold);
+            if (partialLines != null)
+                AddDynamicSceneItem(partialLines);
+        }
+
+        if (!showAllEndToEnd && !showAllPartial && _selectedBoundaryPore != null)
+            AddSelectedPoreConnectionLines();
+    }
+
+    private void AddSelectedPoreConnectionLines()
+    {
+        if (_selectedBoundaryPore == null) return;
+
+        var endToEndPairs = new List<(Cube from, Cube to)>();
+        var partialPairs = new List<(Cube from, Cube to)>();
+
+        if (_endToEndPeersByCube != null
+            && _endToEndPeersByCube.TryGetValue(_selectedBoundaryPore, out var endToEndPeers))
+        {
+            foreach (var peer in endToEndPeers)
+                endToEndPairs.Add((_selectedBoundaryPore, peer));
+        }
+
+        if (_partialPeersByCube != null
+            && _partialPeersByCube.TryGetValue(_selectedBoundaryPore, out var partialPeers))
+        {
+            foreach (var peer in partialPeers)
+                partialPairs.Add((_selectedBoundaryPore, peer));
+        }
+
+        var endToEndLines = HelixSceneBuilder.BuildConnectionLines(endToEndPairs, Colors.DodgerBlue);
+        if (endToEndLines != null)
+            AddDynamicSceneItem(endToEndLines);
+
+        var partialLines = HelixSceneBuilder.BuildConnectionLines(partialPairs, Colors.Gold);
+        if (partialLines != null)
+            AddDynamicSceneItem(partialLines);
     }
 
     private (Color color, double opacity) ResolveBoundaryPoreAppearance(Cube cube)
     {
         if (_selectedBoundaryPore == null)
         {
-            return (Colors.LimeGreen, 1.0);
+            bool isBoundary = _percolationEdgePores != null && _percolationEdgePores.Contains(cube);
+            return isBoundary ? (Colors.LimeGreen, 1.0) : (Colors.DarkSeaGreen, 1.0);
         }
 
         if (ReferenceEquals(cube, _selectedBoundaryPore))

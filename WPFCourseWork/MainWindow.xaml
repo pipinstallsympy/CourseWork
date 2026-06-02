@@ -173,11 +173,42 @@
             </TabItem>
 
             <TabItem x:Name="PercolationTabItem" Header="Перколяция" IsEnabled="False">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <StackPanel Margin="0,8,0,0">
                     <TextBlock Text="Дерево перколяции:"/>
                     <ComboBox x:Name="PercolationTreeSelector"
                               Margin="0,4,0,0"
                               SelectionChanged="OnPercolationTreeSelectionChanged"/>
+
+                    <TextBlock Text="Кликните по поре на границе образца, чтобы подсветить её связи."
+                               Margin="0,8,0,0"
+                               TextWrapping="Wrap"
+                               FontSize="11"
+                               Foreground="Gray"/>
+
+                    <Grid Margin="0,8,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="16"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <Rectangle Grid.Row="0" Grid.Column="0" Width="12" Height="12" Fill="LimeGreen" Margin="0,0,4,4"/>
+                        <TextBlock Grid.Row="0" Grid.Column="1" Text="пограничная / выбранная" FontSize="11" Margin="0,0,0,4"/>
+                        <Rectangle Grid.Row="1" Grid.Column="0" Width="12" Height="12" Fill="DarkSeaGreen" Margin="0,0,4,4"/>
+                        <TextBlock Grid.Row="1" Grid.Column="1" Text="внутренняя" FontSize="11" Margin="0,0,0,4"/>
+                        <Rectangle Grid.Row="2" Grid.Column="0" Width="12" Height="12" Fill="DodgerBlue" Margin="0,0,4,4"/>
+                        <TextBlock Grid.Row="2" Grid.Column="1" Text="сквозная связь" FontSize="11" Margin="0,0,0,4"/>
+                        <Rectangle Grid.Row="3" Grid.Column="0" Width="12" Height="12" Fill="Gold" Margin="0,0,4,4"/>
+                        <TextBlock Grid.Row="3" Grid.Column="1" Text="частичная связь" FontSize="11" Margin="0,0,0,4"/>
+                        <Rectangle Grid.Row="4" Grid.Column="0" Width="12" Height="12" Fill="LightGray" Margin="0,0,4,0"/>
+                        <TextBlock Grid.Row="4" Grid.Column="1" Text="прочие (при выборе)" FontSize="11"/>
+                    </Grid>
 
                     <Rectangle Height="10"/>
 
@@ -193,12 +224,27 @@
                                  Checked="OnPercolationDisplayModeChanged"
                                  Unchecked="OnPercolationDisplayModeChanged"/>
 
+                    <CheckBox x:Name="ShowEndToEndConnectionsCheckBox"
+                              Content="Показать линии сквозных связей"
+                              Margin="0,8,0,0"
+                              Checked="OnPercolationConnectionLinesChanged"
+                              Unchecked="OnPercolationConnectionLinesChanged"/>
+                    <CheckBox x:Name="ShowPartialConnectionsCheckBox"
+                              Content="Показать линии частичных связей"
+                              Margin="0,4,0,0"
+                              Checked="OnPercolationConnectionLinesChanged"
+                              Unchecked="OnPercolationConnectionLinesChanged"/>
+
                     <Rectangle Height="15"/>
 
                     <TextBlock x:Name="PercolationStatsPoreCount" Text="Кол-во пор: -"/>
                     <TextBlock x:Name="PercolationStatsBoundaryPores" Text="Кол-во пограничных пор: -" Margin="0,4,0,0"/>
-                    <TextBlock x:Name="PercolationStatsTreeDepth" Text="Глубина дерева: -" Margin="0,4,0,0"/>
+                    <TextBlock x:Name="PercolationStatsEndToEnd" Text="Пар сквозной перколяции: -" Margin="0,4,0,0"/>
+                    <TextBlock x:Name="PercolationStatsPartial" Text="Пар частичной перколяции: -" Margin="0,4,0,0"/>
+                    <TextBlock x:Name="PercolationStatsHasThrough" Text="Сквозная перколяция: -" Margin="0,4,0,0"/>
+                    <TextBlock x:Name="PercolationStatsTreeDepth" Text="Глубина октодерева: -" Margin="0,4,0,0"/>
                 </StackPanel>
+                </ScrollViewer>
             </TabItem>
         </TabControl>
 

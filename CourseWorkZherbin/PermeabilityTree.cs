@@ -1,3 +1,5 @@
+using System.Runtime.CompilerServices;
+
 namespace CourseWorkZherbin;
 
 public class PermeabilityTreeList
@@ -137,6 +139,61 @@ public class PermeabilityTree
     }
 
     public int TreeDepth => ComputeTreeDepth(startNode);
+
+    public bool HasEndToEndPercolation => EndToEndPermeability.Count > 0;
+
+    public int EndToEndPairCount => CountUniquePairs(EndToEndPermeability);
+
+    public int PartialPairCount => CountUniquePairs(PartialPermeability);
+
+    public string FormatSelectorLabel(int index)
+    {
+        string through = HasEndToEndPercolation ? "сквозная ✓" : "без сквозной";
+        return $"Дерево {index + 1}: {CountPoresInSubtree()} пор, {BoundaryPoreCount} гран., {through}";
+    }
+
+    public static int CountUniquePairs(Dictionary<TreeNode<Cube>, List<TreeNode<Cube>>> dict)
+    {
+        int count = 0;
+        foreach (var _ in EnumerateUniquePairs(dict))
+            count++;
+        return count;
+    }
+
+    public static IEnumerable<(Cube A, Cube B)> EnumerateUniquePairs(
+        Dictionary<TreeNode<Cube>, List<TreeNode<Cube>>> dict)
+    {
+        var seen = new HashSet<(long, long, long, long, long, long)>();
+        foreach (var kvp in dict)
+        {
+            Cube a = kvp.Key.Value;
+            foreach (var node in kvp.Value)
+            {
+                Cube b = node.Value;
+                if (!IsCanonicalPair(a, b)) continue;
+                var key = PairKey(a, b);
+                if (seen.Add(key))
+                    yield return (a, b);
+            }
+        }
+    }
+
+    private static bool IsCanonicalPair(Cube a, Cube b)
+    {
+        const double eps = 1e-9;
+        if (Math.Abs(a.X - b.X) > eps) return a.X < b.X;
+        if (Math.Abs(a.Y - b.Y) > eps) return a.Y < b.Y;
+        if (Math.Abs(a.Z - b.Z) > eps) return a.Z < b.Z;
+        return RuntimeHelpers.GetHashCode(a) < RuntimeHelpers.GetHashCode(b);
+    }
+
+    private static (long, long, long, long, long, long) PairKey(Cube a, Cube b)
+    {
+        static long Q(double v) => (long)Math.Round(v * 1_000_000);
+        if (IsCanonicalPair(a, b))
+            return (Q(a.X), Q(a.Y), Q(a.Z), Q(b.X), Q(b.Y), Q(b.Z));
+        return (Q(b.X), Q(b.Y), Q(b.Z), Q(a.X), Q(a.Y), Q(a.Z));
+    }
 
     private static int ComputeTreeDepth(TreeNode<Cube> node)
     {
