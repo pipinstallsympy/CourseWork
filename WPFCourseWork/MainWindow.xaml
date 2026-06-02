@@ -18,9 +18,6 @@
             <RowDefinition Height = "Auto"></RowDefinition>
         </Grid.RowDefinitions>
         
-        
-        
-        
         <Grid Grid.Row="0" Grid.Column="0" Grid.RowSpan="2" Name="Space3D">
             <Border BorderBrush="Black" BorderThickness="1"></Border>
             <hx:Viewport3DX x:Name="Viewport"
@@ -47,153 +44,159 @@
 
         </Grid>
         
-        
-        <Grid Grid.Row = "0" Grid.Column = "1" >
-            <StackPanel Margin="10">
-                <TextBlock>
-                    Выберите метод:
-                </TextBlock>
-            
-                <StackPanel>
-                    <ComboBox x:Name = "MethodsPanel" SelectedIndex="0">
-                        <ComboBoxItem>"Единичный куб"</ComboBoxItem>
-                        <ComboBoxItem>"Заданный куб"</ComboBoxItem>
-                        <ComboBoxItem>"Куб, заданный двумя точками"</ComboBoxItem>
-                    </ComboBox>
-                    
-                    <StackPanel x:Name = "MethodsValue2" Visibility="Collapsed">
-                        <Rectangle Height="5"/> <!-- Разделитель между элементами -->
+        <TabControl x:Name="MainSideTabControl"
+                    Grid.Row="0"
+                    Grid.Column="1"
+                    Margin="10"
+                    SelectionChanged="OnMainSideTabChanged">
+            <TabItem x:Name="ObjectTabItem" Header="Объект">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+                            <TextBlock>
+                                Выберите метод:
+                            </TextBlock>
                         
-                        <TextBlock> Координаты центровой точки</TextBlock>
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Margin="0,0,4,0">x:</TextBlock>
-                            <TextBox x:Name = "CenterX" Width="50"></TextBox>
-                            <Rectangle Height = "5" Width = "36"></Rectangle> 
-                            
-                            <TextBlock Margin="0,0,4,0">y:</TextBlock>
-                            <TextBox x:Name = "CenterY" Width="50"></TextBox>
-                            <Rectangle Height = "5" Width = "37"></Rectangle> 
-                            
-                            <TextBlock>z:</TextBlock>
-                            <TextBox x:Name = "CenterZ" Width="50"></TextBox>
-                        </StackPanel>
+                            <StackPanel>
+                                <ComboBox x:Name = "MethodsPanel" SelectedIndex="0">
+                                    <ComboBoxItem>"Единичный куб"</ComboBoxItem>
+                                    <ComboBoxItem>"Заданный куб"</ComboBoxItem>
+                                    <ComboBoxItem>"Куб, заданный двумя точками"</ComboBoxItem>
+                                </ComboBox>
+                                
+                                <StackPanel x:Name = "MethodsValue2" Visibility="Collapsed">
+                                    <Rectangle Height="5"/>
+                                    
+                                    <TextBlock> Координаты центровой точки</TextBlock>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Margin="0,0,4,0">x:</TextBlock>
+                                        <TextBox x:Name = "CenterX" Width="50"></TextBox>
+                                        <Rectangle Height = "5" Width = "36"></Rectangle> 
+                                        
+                                        <TextBlock Margin="0,0,4,0">y:</TextBlock>
+                                        <TextBox x:Name = "CenterY" Width="50"></TextBox>
+                                        <Rectangle Height = "5" Width = "37"></Rectangle> 
+                                        
+                                        <TextBlock>z:</TextBlock>
+                                        <TextBox x:Name = "CenterZ" Width="50"></TextBox>
+                                    </StackPanel>
 
-                        <Rectangle Height="10"/> <!-- Разделитель между элементами -->
-                        
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Margin="0,0,4,0">Длина стороны куба: </TextBlock>
-                            <TextBox x:Name = "CubeSideLength" Width="136"></TextBox>
-                        </StackPanel>
+                                    <Rectangle Height="10"/>
+                                    
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Margin="0,0,4,0">Длина стороны куба: </TextBlock>
+                                        <TextBox x:Name = "CubeSideLength" Width="136"></TextBox>
+                                    </StackPanel>
+                                </StackPanel>
+                                
+                                <StackPanel x:Name = "MethodsValue3" Visibility="Collapsed">
+                                    <Rectangle Height="5"/>
+                                    
+                                    <TextBlock> Координаты первой точки</TextBlock>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Margin="0,0,4,0">x:</TextBlock>
+                                        <TextBox x:Name = "P1X" Width="50"></TextBox>
+                                        <Rectangle Height = "5" Width = "36"></Rectangle> 
+                                        
+                                        <TextBlock Margin="0,0,4,0">y:</TextBlock>
+                                        <TextBox x:Name = "P1Y" Width="50"></TextBox>
+                                        <Rectangle Height = "5" Width = "37"></Rectangle> 
+                                        
+                                        <TextBlock>z:</TextBlock>
+                                        <TextBox x:Name = "P1Z" Width="50"></TextBox>
+                                    </StackPanel>
+
+                                    <Rectangle Height="5"/>
+                                    
+                                    <TextBlock> Координаты второй точки</TextBlock>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Margin="0,0,4,0">x:</TextBlock>
+                                        <TextBox x:Name = "P2X" Width="50"></TextBox>
+                                        <Rectangle Height = "5" Width = "36"></Rectangle> 
+                                        
+                                        <TextBlock Margin="0,0,4,0">y:</TextBlock>
+                                        <TextBox x:Name = "P2Y" Width="50"></TextBox>
+                                        <Rectangle Height = "5" Width = "37"></Rectangle> 
+                                        
+                                        <TextBlock>z:</TextBlock>
+                                        <TextBox x:Name = "P2Z" Width="50"></TextBox>
+                                    </StackPanel>
+                                </StackPanel>
+                            </StackPanel>
+                            
+                            <Rectangle Height="15"/>
+                            
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock>
+                                    Введите кол-во разбиений:
+                                </TextBlock>
+                                <TextBox x:Name = "PartitionAmount" Width="100" Margin="5, 0, 0, 0">
+                                </TextBox>
+                            </StackPanel>
+
+                            <Rectangle Height="15"/>
+
+                            <StackPanel x:Name = "PorePanel" >
+                                <TextBlock>Вид распределение пор:</TextBlock>
+                                <RadioButton GroupName="Pores" Content="По количеству" IsChecked="True" />
+                                <RadioButton GroupName="Pores" Content="По процентному соотношению" />
+                            </StackPanel>
+                            
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock>
+                                    Значение:
+                                </TextBlock>
+                                <TextBox x:Name = "PoresValue" Width="196" Margin="5, 0, 0, 0">
+                                </TextBox>
+                            </StackPanel>
+
+                            <Rectangle Height="10"/>
+
+                            <CheckBox x:Name="ColorComponentsCheckBox"
+                                      Checked="OnColorByComponentChanged"
+                                      Unchecked="OnColorByComponentChanged"
+                                      HorizontalContentAlignment="Left">
+                                <TextBlock Text="Показывать связные участки разными цветами"
+                                           TextWrapping="Wrap"
+                                           MaxWidth="230"/>
+                            </CheckBox>
+
+                            <Rectangle Height="5"/>
+
+                            <CheckBox x:Name="PreserveMaterialCheckBox"
+                                      HorizontalContentAlignment="Left">
+                                <TextBlock Text="Сохранять количество материала при соединении"
+                                           TextWrapping="Wrap"
+                                           MaxWidth="230"/>
+                            </CheckBox>
                     </StackPanel>
-                    
-                    <StackPanel x:Name = "MethodsValue3" Visibility="Collapsed">
-                        <Rectangle Height="5"/> <!-- Разделитель между элементами -->
-                        
-                        <TextBlock> Координаты первой точки</TextBlock>
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Margin="0,0,4,0">x:</TextBlock>
-                            <TextBox x:Name = "P1X" Width="50"></TextBox>
-                            <Rectangle Height = "5" Width = "36"></Rectangle> 
-                            
-                            <TextBlock Margin="0,0,4,0">y:</TextBlock>
-                            <TextBox x:Name = "P1Y" Width="50"></TextBox>
-                            <Rectangle Height = "5" Width = "37"></Rectangle> 
-                            
-                            <TextBlock>z:</TextBlock>
-                            <TextBox x:Name = "P1Z" Width="50"></TextBox>
-                        </StackPanel>
+                </ScrollViewer>
+            </TabItem>
 
-                        <Rectangle Height="5"/> <!-- Разделитель между элементами -->
-                        
-                        <TextBlock> Координаты второй точки</TextBlock>
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Margin="0,0,4,0">x:</TextBlock>
-                            <TextBox x:Name = "P2X" Width="50"></TextBox>
-                            <Rectangle Height = "5" Width = "36"></Rectangle> 
-                            
-                            <TextBlock Margin="0,0,4,0">y:</TextBlock>
-                            <TextBox x:Name = "P2Y" Width="50"></TextBox>
-                            <Rectangle Height = "5" Width = "37"></Rectangle> 
-                            
-                            <TextBlock>z:</TextBlock>
-                            <TextBox x:Name = "P2Z" Width="50"></TextBox>
-                        </StackPanel>
-                    </StackPanel>
+            <TabItem x:Name="PercolationTabItem" Header="Перколяция" IsEnabled="False">
+                <StackPanel Margin="0,8,0,0">
+                    <TextBlock Text="Дерево перколяции:"/>
+                    <ComboBox x:Name="PercolationTreeSelector"
+                              Margin="0,4,0,0"
+                              SelectionChanged="OnPercolationTreeSelectionChanged"/>
+
+                    <Rectangle Height="15"/>
+
+                    <TextBlock x:Name="PercolationStatsPoreCount" Text="Кол-во пор: -"/>
+                    <TextBlock x:Name="PercolationStatsBoundaryPores" Text="Кол-во пограничных пор: -" Margin="0,4,0,0"/>
+                    <TextBlock x:Name="PercolationStatsTreeDepth" Text="Глубина дерева: -" Margin="0,4,0,0"/>
                 </StackPanel>
-                
-                <Rectangle Height="15"/> <!-- Разделитель между элементами -->
-                
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock>
-                        Введите кол-во разбиений:
-                    </TextBlock>
-                    <TextBox x:Name = "PartitionAmount" Width="100" Margin="5, 0, 0, 0">
-                    </TextBox>
-                </StackPanel>
+            </TabItem>
+        </TabControl>
 
-                <Rectangle Height="15"/> <!-- Разделитель между элементами -->
-
-                <StackPanel x:Name = "PorePanel" >
-                    <TextBlock>Вид распределение пор:</TextBlock>
-                    <RadioButton GroupName="Pores" Content="По количеству" IsChecked="True" />
-                    <RadioButton GroupName="Pores" Content="По процентному соотношению" />
-                </StackPanel>
-                
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock>
-                        Значение:
-                    </TextBlock>
-                    <TextBox x:Name = "PoresValue" Width="196" Margin="5, 0, 0, 0">
-                    </TextBox>
-                </StackPanel>
-
-                <Rectangle Height="10"/>
-
-                <CheckBox x:Name="ColorComponentsCheckBox"
-                          Checked="OnColorByComponentChanged"
-                          Unchecked="OnColorByComponentChanged"
-                          HorizontalContentAlignment="Left">
-                    <TextBlock Text="Показывать связные участки разными цветами"
-                               TextWrapping="Wrap"
-                               MaxWidth="230"/>
-                </CheckBox>
-
-                <Rectangle Height="5"/>
-
-                <CheckBox x:Name="PreserveMaterialCheckBox"
-                          HorizontalContentAlignment="Left">
-                    <TextBlock Text="Сохранять количество материала при соединении"
-                               TextWrapping="Wrap"
-                               MaxWidth="230"/>
-                </CheckBox>
-
-                <Rectangle Height="5"/>
-
-                <CheckBox x:Name="ShowPercolationCheckBox"
-                          IsEnabled="False"
-                          Checked="OnShowPercolationChanged"
-                          Unchecked="OnShowPercolationChanged"
-                          HorizontalContentAlignment="Left">
-                    <TextBlock Text="Просмотр деревьев перколяции"
-                               TextWrapping="Wrap"
-                               MaxWidth="230"/>
-                </CheckBox>
-
-                <Rectangle Height="5"/>
-
-                <TextBlock Text="Дерево перколяции:"/>
-                <ComboBox x:Name="PercolationTreeSelector"
-                          IsEnabled="False"
-                          SelectionChanged="OnPercolationTreeSelectionChanged"/>
-            </StackPanel>
-        </Grid>
-        
-        <WrapPanel  Grid.Column="1" Grid.Row="1"  Margin="10">
+        <UniformGrid Grid.Column="1"
+                     Grid.Row="1"
+                     Margin="10,0,10,10"
+                     Rows="2"
+                     Columns="2">
             <Button 
                 Content = "Сгенерировать объект"  
                 Click = "OnMethodSelected" 
                 Margin="5" 
-                Width="120" 
                 Height="30" 
                 VerticalAlignment="Bottom">
             </Button>
@@ -203,7 +206,6 @@
                 Content = "Проверка на связность"
                 Click = "OnCheckCoherency"
                 Margin="5"
-                Width="120"
                 Height="30"
                 VerticalAlignment="Bottom">
             </Button>
@@ -213,7 +215,6 @@
                 Content = "Соединить компоненты"
                 Click = "OnConnectComponents"
                 Margin="5"
-                Width="120"
                 Height="30"
                 VerticalAlignment="Bottom">
             </Button>
@@ -222,10 +223,9 @@
                 Content = "Проверка на перколяцию"
                 Click = "OnCheckPercolation"
                 Margin="5" 
-                Width="120" 
                 Height="30" 
                 VerticalAlignment="Bottom">
             </Button>
-        </WrapPanel>
+        </UniformGrid>
     </Grid>
 </Window>

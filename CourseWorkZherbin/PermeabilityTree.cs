@@ -100,6 +100,34 @@ public class PermeabilityTree
         CreateDictionaries(fullSideLength);
     }
 
+    public int BoundaryPoreCount => edgeNodes.Count;
+
+    public int CountPoresInSubtree()
+    {
+        int count = 0;
+        var stack = new Stack<TreeNode<Cube>>();
+        stack.Push(startNode);
+        while (stack.Count > 0)
+        {
+            var node = stack.Pop();
+            if (node.Value.IsEmpty) count++;
+            foreach (var child in node.Children)
+                stack.Push(child);
+        }
+        return count;
+    }
+
+    public int TreeDepth => ComputeTreeDepth(startNode);
+
+    private static int ComputeTreeDepth(TreeNode<Cube> node)
+    {
+        if (node.Children.Count == 0) return 1;
+        int maxChildDepth = 0;
+        foreach (var child in node.Children)
+            maxChildDepth = Math.Max(maxChildDepth, ComputeTreeDepth(child));
+        return maxChildDepth + 1;
+    }
+
     private void CreateEdgeNodes(TreeNode<Cube> n)
     {
         var stack = new Stack<TreeNode<Cube>>();
