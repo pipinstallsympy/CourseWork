@@ -45,7 +45,13 @@ public class PermeabilityDictionary
             Merge(PartialPermeability, elem.PartialPermeability);
         }
     }
-    
+
+    public PermeabilityDictionary(PermeabilityTree tree)
+    {
+        Merge(EndToEndPermeability, tree.EndToEndPermeability);
+        Merge(PartialPermeability, tree.PartialPermeability);
+    }
+
     private static void Merge(
         Dictionary<TreeNode<Cube>, List<TreeNode<Cube>>> target,
         Dictionary<TreeNode<Cube>, List<TreeNode<Cube>>> source)

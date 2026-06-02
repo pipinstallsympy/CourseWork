@@ -27,6 +27,8 @@ public partial class MainWindow : Window
     private Cube? _selectedBoundaryPore;
     private Dictionary<Cube, HashSet<Cube>>? _partialPeersByCube;
     private Dictionary<Cube, HashSet<Cube>>? _endToEndPeersByCube;
+    private int? _selectedPercolationTreeIndex;
+    private bool _updatingPercolationSelector;
 
     private const int CoherencyPartitionWarningThreshold = 48;
     private bool _coherencyCalculationInProgress;
@@ -328,9 +330,12 @@ public partial class MainWindow : Window
         _partialPeersByCube = null;
         _endToEndPeersByCube = null;
         _selectedBoundaryPore = null;
+        _selectedPercolationTreeIndex = null;
         StatsPercolationCount.Text = "Деревьев перколяции: -";
         ShowPercolationCheckBox.IsChecked = false;
         ShowPercolationCheckBox.IsEnabled = false;
+        PercolationTreeSelector.Items.Clear();
+        PercolationTreeSelector.IsEnabled = false;
     }
 
     private static int GetPartitionFromLine(CubeLine line) =>
@@ -430,16 +435,15 @@ public partial class MainWindow : Window
 
             var sw = Stopwatch.StartNew();
             _permeabilityTreeList = new PermeabilityTreeList(grid, fullSideLength);
-            var dict = new PermeabilityDictionary(_permeabilityTreeList);
-            (_percolationBoundaryPores, _partialPeersByCube, _endToEndPeersByCube)
-                = BuildPercolationIndex(dict);
-            _selectedBoundaryPore = null;
             sw.Stop();
 
             StatsPercolationCount.Text = $"Деревьев перколяции: {_permeabilityTreeList.TreeList.Count}";
             StatsLastCalcTime.Text = $"Время последнего расчёта: {sw.ElapsedMilliseconds} мс";
 
-            ShowPercolationCheckBox.IsEnabled = true;
+            PopulatePercolationTreeSelector();
+            ApplyPercolationView();
+
+            ShowPercolationCheckBox.IsEnabled = _permeabilityTreeList.TreeList.Count > 0;
         }
         catch (Exception ex)
         {
@@ -455,6 +459,64 @@ public partial class MainWindow : Window
         }
         if (_currentLine == null) return;
         RedrawCubes();
+    }
+
+    private void PopulatePercolationTreeSelector()
+    {
+        _updatingPercolationSelector = true;
+        try
+        {
+            PercolationTreeSelector.Items.Clear();
+            if (_permeabilityTreeList == null || _permeabilityTreeList.TreeList.Count == 0)
+            {
+                PercolationTreeSelector.IsEnabled = false;
+                _selectedPercolationTreeIndex = null;
+                return;
+            }
+
+            PercolationTreeSelector.Items.Add("Все деревья");
+            for (int i = 0; i < _permeabilityTreeList.TreeList.Count; i++)
+            {
+                int poreCount = _permeabilityTreeList.TreeList[i].edgeNodes.Count;
+                PercolationTreeSelector.Items.Add($"Дерево {i + 1} ({poreCount} пор)");
+            }
+
+            PercolationTreeSelector.SelectedIndex = 1;
+            _selectedPercolationTreeIndex = 0;
+            PercolationTreeSelector.IsEnabled = true;
+        }
+        finally
+        {
+            _updatingPercolationSelector = false;
+        }
+    }
+
+    private void ApplyPercolationView()
+    {
+        if (_permeabilityTreeList == null) return;
+
+        PermeabilityDictionary dict = _selectedPercolationTreeIndex is int i
+            ? new PermeabilityDictionary(_permeabilityTreeList.TreeList[i])
+            : new PermeabilityDictionary(_permeabilityTreeList);
+
+        (_percolationBoundaryPores, _partialPeersByCube, _endToEndPeersByCube)
+            = BuildPercolationIndex(dict);
+        _selectedBoundaryPore = null;
+
+        if (ShowPercolationCheckBox.IsChecked == true && _currentLine != null)
+            RedrawCubes();
+    }
+
+    private void OnPercolationTreeSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_updatingPercolationSelector) return;
+        if (PercolationTreeSelector.Items.Count == 0) return;
+        if (PercolationTreeSelector.SelectedIndex < 0) return;
+
+        _selectedPercolationTreeIndex = PercolationTreeSelector.SelectedIndex == 0
+            ? null
+            : PercolationTreeSelector.SelectedIndex - 1;
+        ApplyPercolationView();
     }
 
     private void OnViewport3DClick(object sender, MouseButtonEventArgs e)

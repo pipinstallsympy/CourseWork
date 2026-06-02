@@ -178,6 +178,13 @@
                                TextWrapping="Wrap"
                                MaxWidth="230"/>
                 </CheckBox>
+
+                <Rectangle Height="5"/>
+
+                <TextBlock Text="Дерево перколяции:"/>
+                <ComboBox x:Name="PercolationTreeSelector"
+                          IsEnabled="False"
+                          SelectionChanged="OnPercolationTreeSelectionChanged"/>
             </StackPanel>
         </Grid>
         
