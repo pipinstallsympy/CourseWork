@@ -28,6 +28,9 @@ public partial class MainWindow : Window
     private Dictionary<Cube, HashSet<Cube>>? _partialPeersByCube;
     private Dictionary<Cube, HashSet<Cube>>? _endToEndPeersByCube;
 
+    private const int CoherencyPartitionWarningThreshold = 48;
+    private bool _coherencyCalculationInProgress;
+
     public MainWindow()
     {
         InitializeComponent();
@@ -330,7 +333,34 @@ public partial class MainWindow : Window
         ShowPercolationCheckBox.IsEnabled = false;
     }
 
-    private void OnCheckCoherency(object sender, RoutedEventArgs e)
+    private static int GetPartitionFromLine(CubeLine line) =>
+        (int)Math.Round(Math.Cbrt(line.Count()));
+
+    private bool ConfirmLargePartitionOperation(int partition, bool connectComponents)
+    {
+        if (partition < CoherencyPartitionWarningThreshold) return true;
+        string message = connectComponents
+            ? $"При разбиении {partition} объединение матрицы материала может занять несколько минут. Продолжить?"
+            : $"При разбиении {partition} расчёт связности может занять несколько минут. Продолжить?";
+        string title = connectComponents ? "Соединение компонентов" : "Проверка связности";
+        var result = MessageBox.Show(
+            message,
+            title,
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+        return result == MessageBoxResult.Yes;
+    }
+
+    private void SetCoherencyBusy(bool busy)
+    {
+        _coherencyCalculationInProgress = busy;
+        CheckCoherencyButton.IsEnabled = !busy;
+        ConnectComponentsButton.IsEnabled = !busy;
+        if (busy)
+            StatsCoherencyCount.Text = "Связных компонент: идёт расчёт…";
+    }
+
+    private async void OnCheckCoherency(object sender, RoutedEventArgs e)
     {
         if (_currentLine == null)
         {
@@ -338,21 +368,38 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (_coherencyCalculationInProgress) return;
+
+        int partition = GetPartitionFromLine(_currentLine);
+        if (!ConfirmLargePartitionOperation(partition, connectComponents: false)) return;
+
+        var line = _currentLine;
+        SetCoherencyBusy(true);
         try
         {
-            var coherency = new Coherency();
-            using var grid = _currentLine.GenerateGridFromLine();
-            var sw = Stopwatch.StartNew();
-            coherenceTreeList = coherency.CreateCT(grid);
-            sw.Stop();
-            _cubeColorMap = BuildColorMap(coherenceTreeList);
-            StatsLastCalcTime.Text = $"Время последнего расчёта: {sw.ElapsedMilliseconds} мс";
+            var (trees, colorMap, elapsedMs) = await Task.Run(() =>
+            {
+                using var grid = line.GenerateGridFromLine();
+                var sw = Stopwatch.StartNew();
+                var resultTrees = new Coherency().CreateCT(grid);
+                var map = BuildColorMap(resultTrees);
+                sw.Stop();
+                return (resultTrees, map, sw.ElapsedMilliseconds);
+            });
+
+            coherenceTreeList = trees;
+            _cubeColorMap = colorMap;
+            StatsLastCalcTime.Text = $"Время последнего расчёта: {elapsedMs} мс";
             StatsCoherencyCount.Text = $"Связных компонент: {coherenceTreeList.Count}";
             RedrawCubes();
         }
         catch (Exception ex)
         {
             MessageBox.Show(ex.Message);
+        }
+        finally
+        {
+            SetCoherencyBusy(false);
         }
     }
 
@@ -482,7 +529,16 @@ public partial class MainWindow : Window
         }
     }
 
-    private void OnConnectComponents(object sender, RoutedEventArgs e)
+    private sealed class ConnectComponentsWorkResult
+    {
+        public bool AlreadyConnected { get; init; }
+        public List<TreeNode<Cube>> Trees { get; init; } = new();
+        public Dictionary<Cube, Color> ColorMap { get; init; } = new();
+        public long ElapsedMs { get; init; }
+        public int LeavesShortage { get; init; }
+    }
+
+    private async void OnConnectComponents(object sender, RoutedEventArgs e)
     {
         if (_currentLine == null)
         {
@@ -490,65 +546,101 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (_coherencyCalculationInProgress) return;
+
+        int partition = GetPartitionFromLine(_currentLine);
+        if (!ConfirmLargePartitionOperation(partition, connectComponents: true)) return;
+
+        var line = _currentLine;
+        bool preserveMaterial = PreserveMaterialCheckBox?.IsChecked == true;
+        SetCoherencyBusy(true);
         try
         {
-            bool preserveMaterial = PreserveMaterialCheckBox?.IsChecked == true;
-            var sw = Stopwatch.StartNew();
-
-            using var grid = _currentLine.GenerateGridFromLine();
-            var components = new Coherency().CreateCT(grid);
-
-            if (components.Count <= 1)
+            var workResult = await Task.Run(() =>
             {
+                var sw = Stopwatch.StartNew();
+                using var grid = line.GenerateGridFromLine();
+                var components = new Coherency().CreateCT(grid);
+
+                if (components.Count <= 1)
+                {
+                    sw.Stop();
+                    return new ConnectComponentsWorkResult
+                    {
+                        AlreadyConnected = true,
+                        ElapsedMs = sw.ElapsedMilliseconds
+                    };
+                }
+
+                var bridges = new CoherencyConnector().ConnectAll(grid, components);
+
+                var distinctBridgeCubes = new HashSet<Cube>();
+                foreach (var b in bridges)
+                {
+                    foreach (var c in b.EmptyCubesToFill)
+                        distinctBridgeCubes.Add(c);
+                }
+
+                int bridgeCubesCount = distinctBridgeCubes.Count;
+                int leavesShortage = 0;
+
+                if (preserveMaterial && bridgeCubesCount > 0)
+                {
+                    var forbidden = BuildForbiddenSet(grid, distinctBridgeCubes);
+                    int removed = RemoveLeavesCascade(components, forbidden, bridgeCubesCount);
+                    leavesShortage = bridgeCubesCount - removed;
+                }
+
+                foreach (var cube in distinctBridgeCubes)
+                {
+                    if (cube.IsEmpty) cube.IsEmpty = false;
+                }
+
+                using var gridAfter = line.GenerateGridFromLine();
+                var trees = new Coherency().CreateCT(gridAfter);
+                var colorMap = BuildColorMap(trees);
                 sw.Stop();
+
+                return new ConnectComponentsWorkResult
+                {
+                    Trees = trees,
+                    ColorMap = colorMap,
+                    ElapsedMs = sw.ElapsedMilliseconds,
+                    LeavesShortage = leavesShortage
+                };
+            });
+
+            if (workResult.AlreadyConnected)
+            {
                 MessageBox.Show("Все узлы материала уже связаны.");
+                StatsLastCalcTime.Text = $"Время последнего расчёта: {workResult.ElapsedMs} мс";
+                StatsCoherencyCount.Text = coherenceTreeList.Count > 0
+                    ? $"Связных компонент: {coherenceTreeList.Count}"
+                    : "Связных компонент: -";
                 return;
             }
 
-            var bridges = new CoherencyConnector().ConnectAll(grid, components);
-
-            var distinctBridgeCubes = new HashSet<Cube>();
-            foreach (var b in bridges)
-                foreach (var c in b.EmptyCubesToFill)
-                    distinctBridgeCubes.Add(c);
-
-            int bridgeCubesCount = distinctBridgeCubes.Count;
-            int leavesShortage = 0;
-
-            if (preserveMaterial && bridgeCubesCount > 0)
-            {
-                var forbidden = BuildForbiddenSet(grid, distinctBridgeCubes);
-                int removed = RemoveLeavesCascade(components, forbidden, bridgeCubesCount);
-                leavesShortage = bridgeCubesCount - removed;
-            }
-
-            foreach (var cube in distinctBridgeCubes)
-            {
-                if (cube.IsEmpty) cube.IsEmpty = false;
-            }
-
-            using var gridAfter = _currentLine.GenerateGridFromLine();
-            coherenceTreeList = new Coherency().CreateCT(gridAfter);
-            _cubeColorMap = BuildColorMap(coherenceTreeList);
-
-            sw.Stop();
-
-            UpdateNodeStats(_currentLine);
+            coherenceTreeList = workResult.Trees;
+            _cubeColorMap = workResult.ColorMap;
+            UpdateNodeStats(line);
             StatsCoherencyCount.Text = $"Связных компонент: {coherenceTreeList.Count}";
-            StatsLastCalcTime.Text = $"Время последнего расчёта: {sw.ElapsedMilliseconds} мс";
-
+            StatsLastCalcTime.Text = $"Время последнего расчёта: {workResult.ElapsedMs} мс";
             RedrawCubes();
 
-            if (leavesShortage > 0)
+            if (workResult.LeavesShortage > 0)
             {
                 MessageBox.Show(
                     $"Не хватило листовых узлов материала для полного сохранения количества: " +
-                    $"{leavesShortage} соединяющих узлов добавлены без компенсации.");
+                    $"{workResult.LeavesShortage} соединяющих узлов добавлены без компенсации.");
             }
         }
         catch (Exception ex)
         {
             MessageBox.Show(ex.Message);
+        }
+        finally
+        {
+            SetCoherencyBusy(false);
         }
     }
 

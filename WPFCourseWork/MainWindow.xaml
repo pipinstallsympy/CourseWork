@@ -192,6 +192,7 @@
             </Button>
 
             <Button
+                x:Name="CheckCoherencyButton"
                 Content = "Проверка на связность"
                 Click = "OnCheckCoherency"
                 Margin="5"
@@ -201,6 +202,7 @@
             </Button>
 
             <Button
+                x:Name="ConnectComponentsButton"
                 Content = "Соединить компоненты"
                 Click = "OnConnectComponents"
                 Margin="5"
