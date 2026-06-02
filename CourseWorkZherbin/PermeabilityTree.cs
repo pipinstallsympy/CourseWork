@@ -95,11 +95,18 @@ public class PermeabilityTree
     }
 
     private void CreateEdgeNodes(TreeNode<Cube> n)
-    { 
-        foreach (TreeNode<Cube> node in n.Children)
+    {
+        var stack = new Stack<TreeNode<Cube>>();
+        for (int c = n.Children.Count - 1; c >= 0; c--)
+            stack.Push(n.Children[c]);
+
+        while (stack.Count > 0)
         {
-            if (node.Value.IsEmpty && IsOnGridBoundary(node.Value)) edgeNodes.Add(node);
-            CreateEdgeNodes(node);
+            var node = stack.Pop();
+            if (node.Value.IsEmpty && IsOnGridBoundary(node.Value))
+                edgeNodes.Add(node);
+            for (int c = node.Children.Count - 1; c >= 0; c--)
+                stack.Push(node.Children[c]);
         }
     }
 

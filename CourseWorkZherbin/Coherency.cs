@@ -2,59 +2,80 @@ namespace CourseWorkZherbin;
 
 public class Coherency
 {
-    static List<Cube> freeNodes = new List<Cube>(); 
-    static List<Cube> usedNodes = new List<Cube>();
-    static CubeGrid grid;
-    private static int count;
     public List<TreeNode<Cube>> CreateCT(CubeGrid g, bool isMaterial = true)
     {
-        freeNodes = isMaterial ? g.GetMaterial() : g.GetPores();
-        usedNodes.Clear();
-        grid = g;
-        count = grid.Count();
-        
+        int n = g.Count();
+        bool[,,] visited = new bool[n, n, n];
         List<TreeNode<Cube>> nodes = new List<TreeNode<Cube>>();
-        while (freeNodes.Count > 0)
+
+        for (int i = 0; i < n; i++)
         {
-            usedNodes.Add(freeNodes[0]);
-            TreeNode<Cube> node = new TreeNode<Cube>(freeNodes[0]);
-            freeNodes.RemoveAt(0);
-            nodes.Add(node);
-            RecursionCT(node, isMaterial);
+            for (int j = 0; j < n; j++)
+            {
+                for (int k = 0; k < n; k++)
+                {
+                    Cube cube = g[i][j][k];
+                    if (!(cube.IsEmpty ^ isMaterial)) continue;
+                    if (visited[i, j, k]) continue;
+
+                    visited[i, j, k] = true;
+                    TreeNode<Cube> node = new TreeNode<Cube>(cube);
+                    nodes.Add(node);
+                    IterativeCT(g, visited, isMaterial, n, node, i, j, k);
+                }
+            }
         }
 
         return nodes;
     }
 
-    private void RecursionCT(TreeNode<Cube> node, bool isMaterial)
+    private static void IterativeCT(
+        CubeGrid grid,
+        bool[,,] visited,
+        bool isMaterial,
+        int count,
+        TreeNode<Cube> root,
+        int rootX,
+        int rootY,
+        int rootZ)
     {
-        List<int>? currIndex = grid.IndexOf(node.Value);
-        if (currIndex == null) throw new NullReferenceException("Recursion CT");
-        int x = currIndex[0];
-        int y = currIndex[1];
-        int z = currIndex[2];
-        for (int i = -1; i <= 1; i++)
+        var stack = new Stack<(TreeNode<Cube> node, int x, int y, int z)>();
+        var toPush = new List<(TreeNode<Cube> node, int x, int y, int z)>();
+        stack.Push((root, rootX, rootY, rootZ));
+
+        while (stack.Count > 0)
         {
-            for (int j = -1; j <= 1; j++)
+            var (node, x, y, z) = stack.Pop();
+            toPush.Clear();
+
+            for (int i = -1; i <= 1; i++)
             {
-                for (int k = -1; k <= 1; k++)
+                for (int j = -1; j <= 1; j++)
                 {
-                    if (x + i < 0 || y + j < 0 || z + k < 0) continue;
-                    if (x + i >= count || y + j >= count || z + k >= count) continue;
-                    if (Math.Abs(i) + Math.Abs(j) + Math.Abs(k) != 1) continue;
+                    for (int k = -1; k <= 1; k++)
+                    {
+                        int nx = x + i;
+                        int ny = y + j;
+                        int nz = z + k;
+                        if (nx < 0 || ny < 0 || nz < 0) continue;
+                        if (nx >= count || ny >= count || nz >= count) continue;
+                        if (Math.Abs(i) + Math.Abs(j) + Math.Abs(k) != 1) continue;
 
-                    Cube c = grid[x + i][y + j][z + k];
-                    if(!(c.IsEmpty ^ isMaterial)) continue;
-                    if(usedNodes.Contains(c)) continue;
-                    freeNodes.Remove(c);
-                    usedNodes.Add(c);
+                        Cube c = grid[nx][ny][nz];
+                        if (!(c.IsEmpty ^ isMaterial)) continue;
+                        if (visited[nx, ny, nz]) continue;
+                        visited[nx, ny, nz] = true;
 
-                    TreeNode<Cube> newChild = new TreeNode<Cube>(c);
-                    newChild.Parent = node;
-                    node.Children.Add(newChild);
-                    RecursionCT(newChild, isMaterial);
+                        TreeNode<Cube> newChild = new TreeNode<Cube>(c);
+                        newChild.Parent = node;
+                        node.Children.Add(newChild);
+                        toPush.Add((newChild, nx, ny, nz));
+                    }
                 }
             }
+
+            for (int t = toPush.Count - 1; t >= 0; t--)
+                stack.Push(toPush[t]);
         }
     }
 }
