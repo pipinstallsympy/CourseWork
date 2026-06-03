@@ -63,10 +63,7 @@ public class CubeLine : IDisposable
         return grid;
     }
 
-    /// <summary>
-    /// Делает ровно <paramref name="poreAmount"/> ячеек порой (случайное подмножество позиций).
-    /// Рассчитан на линию из материала; при уже существующих порях итог может не совпасть с «добором».
-    /// </summary>
+
     public void GeneratePoresByCount(int poreAmount)
     {
         int len = Count();
@@ -78,10 +75,7 @@ public class CubeLine : IDisposable
         GeneratePoresHybrid(poreAmount);
     }
 
-    /// <summary>
-    /// Делает ровно ceil(percent·n/100) пор (случайное подмножество позиций).
-    /// Рассчитан на линию из материала; при уже существующих порях итог может не совпасть с «добором».
-    /// </summary>
+
     public void GeneratePoresByPercent(double percent)
     {
         if (percent is < 0 or >= 100)
