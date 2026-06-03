@@ -113,7 +113,6 @@ public class CubeLine : IDisposable
             else
             {
                 int m = len - k;
-                SetAllPores();
                 PartialFisherShuffle(indices, len, m);
                 for (int i = 0; i < m; i++)
                     Line[indices[i]].IsEmpty = false;

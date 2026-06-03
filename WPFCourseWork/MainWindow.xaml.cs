@@ -175,7 +175,20 @@ public partial class MainWindow : Window
 
     private void CalculationsSingular(int partition, string? poreChoice, double poresValue)
     {
-        using (CubeGrid griddy = new CubeGrid(partition))
+        switch (poreChoice)
+        {
+            case "По количеству":
+                int threshold = partition * partition * partition / 2;
+                break;
+            case "По процентному соотношению":
+                break;
+            default:
+                MessageBox.Show("При выборе метода созданию пор пошло что-то не так");
+                break;
+        }
+        
+        bool flag = CreateFlag(partition, poreChoice, poresValue);
+        using (CubeGrid griddy = new CubeGrid(partition, flag))
         {
             CubeLine? liney = griddy.GenerateLineFromGrid();
             CreatePores(liney, poreChoice, poresValue);
@@ -214,7 +227,8 @@ public partial class MainWindow : Window
         try
         {
             startCube = new Cube(new Point(centerX, centerY, centerZ), sideLength);
-            using (griddy = new CubeGrid(startCube, partition))
+            bool flag = CreateFlag(partition, poreChoice, poresValue);
+            using (griddy = new CubeGrid(startCube, partition, flag))
             {
                 liney = griddy.GenerateLineFromGrid();
                 CreatePores(liney, poreChoice, poresValue);
@@ -269,7 +283,8 @@ public partial class MainWindow : Window
 
         try
         {
-            using (griddy = new CubeGrid(p1, p2, partition))
+            bool flag = CreateFlag(partition, poreChoice, poresValue);
+            using (griddy = new CubeGrid(p1, p2, partition, flag))
             {
                 liney = griddy.GenerateLineFromGrid();
                 CreatePores(liney, poreChoice, poresValue);
@@ -282,6 +297,22 @@ public partial class MainWindow : Window
         {
             MessageBox.Show(e.Message);
         }
+    }
+
+
+    private bool CreateFlag(int partition, string? poreChoice, double poresValue)
+    {
+        switch (poreChoice)
+        {
+            case "По количеству":
+                int threshold = partition * partition * partition / 2;
+                return poresValue > threshold;
+                
+            case "По процентному соотношению":
+                return poresValue > 50;
+        }
+
+        return false;
     }
 
     private void RunTimedCalculation(Action calculation)

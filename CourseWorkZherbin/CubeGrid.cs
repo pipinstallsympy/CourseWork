@@ -8,7 +8,7 @@ public class CubeGrid : IDisposable
     {
         Grid = new List<List<List<Cube>>>();
     }
-    public CubeGrid(int partition)
+    public CubeGrid(int partition, bool isEmpty = false)
     {
         if (partition <= 0)
         {
@@ -30,13 +30,13 @@ public class CubeGrid : IDisposable
                 for (int k = 0; k < partition; k++)
                 {
                     p = new Point(halfStep + i * step, halfStep + j * step, halfStep + k * step);
-                    Grid[i][j].Add(new Cube(p, step));
+                    Grid[i][j].Add(new Cube(p, step, isEmpty));
                 }
             }
         }
     }
     
-    public CubeGrid(Cube startCube, int partition)
+    public CubeGrid(Cube startCube, int partition, bool isEmpty = false)
     {
         if (partition <= 0)
         {
@@ -67,13 +67,13 @@ public class CubeGrid : IDisposable
                 for (int k = 0; k < partition; k++)
                 {
                     p = new Point(startX + i * step, startY + j * step, startZ + k * step);
-                    Grid[i][j].Add(new Cube(p, step));
+                    Grid[i][j].Add(new Cube(p, step, isEmpty));
                 }
             }
         }
     }
 
-    public CubeGrid(Point startPoint, Point endPoint, int partition)
+    public CubeGrid(Point startPoint, Point endPoint, int partition, bool isEmpty = false)
     {
         if (partition <= 0)
         {
@@ -121,7 +121,7 @@ public class CubeGrid : IDisposable
                 for (int k = 0; k < partition; k++)
                 {
                     p = new Point(startX + i * step, startY + j * step, startZ + k * step);
-                    Grid[i][j].Add(new Cube(p, step));
+                    Grid[i][j].Add(new Cube(p, step, isEmpty));
                 }
             }
         }
