@@ -1,3 +1,5 @@
+using System.Buffers;
+
 namespace CourseWorkZherbin;
 
 public class CubeLine : IDisposable
@@ -61,6 +63,10 @@ public class CubeLine : IDisposable
         return grid;
     }
 
+    /// <summary>
+    /// Делает ровно <paramref name="poreAmount"/> ячеек порой (случайное подмножество позиций).
+    /// Рассчитан на линию из материала; при уже существующих порях итог может не совпасть с «добором».
+    /// </summary>
     public void GeneratePoresByCount(int poreAmount)
     {
         int len = Count();
@@ -68,47 +74,80 @@ public class CubeLine : IDisposable
         {
             throw new ArgumentException("Кол-во пор не может быть меньше 0 и больше кол-во элементов в разбиении");
         }
-        
-        int poreCount = PoreAmount();
-        int randIndex;
-        Random rand = new Random();
 
-        
-        while(poreAmount != poreCount)
-        {
-            randIndex = rand.Next(len);
-            if (Line[randIndex].IsEmpty == false)
-            {
-                Line[randIndex].IsEmpty = true;
-                poreCount++;
-            }
-        }
+        GeneratePoresHybrid(poreAmount);
     }
 
+    /// <summary>
+    /// Делает ровно ceil(percent·n/100) пор (случайное подмножество позиций).
+    /// Рассчитан на линию из материала; при уже существующих порях итог может не совпасть с «добором».
+    /// </summary>
     public void GeneratePoresByPercent(double percent)
     {
         if (percent is < 0 or >= 100)
         {
             throw new ArgumentException("Кол-во процентов принадлежит отрезку [0, 100)");
         }
-        
-        int randIndex;
+
         int len = Line.Count;
-        int poreCount = PoreAmount();
-        double porePercent = (double)poreCount / len;
-        Random rand = new Random();
+        int k = (int)Math.Ceiling(percent / 100.0 * len);
+        GeneratePoresHybrid(k);
+    }
 
+    void GeneratePoresHybrid(int k)
+    {
+        int len = Line.Count;
+        if (k <= 0) return;
 
-        while(porePercent < percent)
+        if (k >= len)
         {
-            randIndex = rand.Next(len);
-            if (Line[randIndex].IsEmpty == false)
+            SetAllPores();
+            return;
+        }
+
+        int[] indices = ArrayPool<int>.Shared.Rent(len);
+        try
+        {
+            InitIndices(indices, len);
+
+            if (k <= len / 2)
             {
-                Line[randIndex].IsEmpty = true;
-                poreCount++;
-                porePercent = (double)poreCount / len * 100;
+                PartialFisherShuffle(indices, len, k);
+                for (int i = 0; i < k; i++)
+                    Line[indices[i]].IsEmpty = true;
+            }
+            else
+            {
+                int m = len - k;
+                SetAllPores();
+                PartialFisherShuffle(indices, len, m);
+                for (int i = 0; i < m; i++)
+                    Line[indices[i]].IsEmpty = false;
             }
         }
+        finally
+        {
+            ArrayPool<int>.Shared.Return(indices);
+        }
+    }
+
+    static void InitIndices(int[] indices, int len)
+    {
+        for (int i = 0; i < len; i++) indices[i] = i;
+    }
+
+    static void PartialFisherShuffle(int[] indices, int len, int steps)
+    {
+        for (int i = 0; i < steps; i++)
+        {
+            int j = Random.Shared.Next(i, len);
+            (indices[i], indices[j]) = (indices[j], indices[i]);
+        }
+    }
+
+    void SetAllPores()
+    {
+        foreach (Cube c in Line) c.IsEmpty = true;
     }
 
     public int PoreAmount()

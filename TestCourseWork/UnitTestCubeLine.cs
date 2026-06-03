@@ -1,4 +1,4 @@
-﻿using CourseWorkZherbin;
+using CourseWorkZherbin;
 
 namespace TestCourseWork;
 
@@ -64,5 +64,43 @@ public class UnitTestCubeLine
     public void TestGeneratePoresByCount_Exception(CubeLine line, int poreAmount)
     {
         Assert.Throws<ArgumentException>(() => line.GeneratePoresByCount(poreAmount));
+    }
+
+    public static IEnumerable<object[]> Test_Data4()
+    {
+        yield return [new CubeLine(new CubeGrid(10)), 1.0];
+        yield return [new CubeLine(new CubeGrid(10)), 50.0];
+        yield return [new CubeLine(new CubeGrid(10)), 99.0];
+    }
+
+    [Theory]
+    [MemberData(nameof(Test_Data4))]
+    public void TestGeneratePoresByPercent(CubeLine line, double percent)
+    {
+        int len = line.Line.Count;
+        int expected = (int)Math.Ceiling(percent / 100.0 * len);
+        line.GeneratePoresByPercent(percent);
+        Assert.Equal(expected, line.PoreAmount());
+    }
+
+    public static IEnumerable<object[]> Test_Data5()
+    {
+        yield return [new CubeLine(new CubeGrid(10)), -1.0];
+        yield return [new CubeLine(new CubeGrid(10)), 100.0];
+    }
+
+    [Theory]
+    [MemberData(nameof(Test_Data5))]
+    public void TestGeneratePoresByPercent_Exception(CubeLine line, double percent)
+    {
+        Assert.Throws<ArgumentException>(() => line.GeneratePoresByPercent(percent));
+    }
+
+    [Fact]
+    public void TestGeneratePoresByPercent_HalfBoundary()
+    {
+        var line = new CubeLine(new CubeGrid(10));
+        line.GeneratePoresByPercent(50);
+        Assert.Equal(500, line.PoreAmount());
     }
 }
