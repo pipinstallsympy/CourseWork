@@ -2,7 +2,17 @@ namespace CourseWorkZherbin;
 
 public class Coherency
 {
-    public List<TreeNode<Cube>> CreateCT(CubeGrid g, bool isMaterial = true)
+    private static readonly (int dx, int dy, int dz)[] directions =
+    {
+        (-1, 0, 0),
+        (1, 0, 0),
+        (0, -1, 0),
+        (0, 1, 0),
+        (0, 0, -1),
+        (0, 0, 1),
+    };
+    
+    public static List<TreeNode<Cube>> CreateCt(CubeGrid g, bool isMaterial = true)
     {
         int n = g.Count();
         bool[,,] visited = new bool[n, n, n];
@@ -21,7 +31,7 @@ public class Coherency
                     visited[i, j, k] = true;
                     TreeNode<Cube> node = new TreeNode<Cube>(cube);
                     nodes.Add(node);
-                    IterativeCT(g, visited, isMaterial, n, node, i, j, k);
+                    IterativeCt(g, visited, isMaterial, n, node, i, j, k);
                 }
             }
         }
@@ -29,7 +39,7 @@ public class Coherency
         return nodes;
     }
 
-    private static void IterativeCT(
+    private static void IterativeCt(
         CubeGrid grid,
         bool[,,] visited,
         bool isMaterial,
@@ -48,30 +58,23 @@ public class Coherency
             var (node, x, y, z) = stack.Pop();
             toPush.Clear();
 
-            for (int i = -1; i <= 1; i++)
+            for (int i = 0; i < 6; i++)
             {
-                for (int j = -1; j <= 1; j++)
-                {
-                    for (int k = -1; k <= 1; k++)
-                    {
-                        int nx = x + i;
-                        int ny = y + j;
-                        int nz = z + k;
-                        if (nx < 0 || ny < 0 || nz < 0) continue;
-                        if (nx >= count || ny >= count || nz >= count) continue;
-                        if (Math.Abs(i) + Math.Abs(j) + Math.Abs(k) != 1) continue;
+                int nx = x + directions[i].dx;
+                int ny = y + directions[i].dy;
+                int nz = z + directions[i].dz;
+                if (nx < 0 || ny < 0 || nz < 0) continue; 
+                if (nx >= count || ny >= count || nz >= count) continue;
 
-                        Cube c = grid[nx][ny][nz];
-                        if (!(c.IsEmpty ^ isMaterial)) continue;
-                        if (visited[nx, ny, nz]) continue;
-                        visited[nx, ny, nz] = true;
+                Cube c = grid[nx][ny][nz];
+                if (!(c.IsEmpty ^ isMaterial)) continue;
+                if (visited[nx, ny, nz]) continue;
+                visited[nx, ny, nz] = true;
 
-                        TreeNode<Cube> newChild = new TreeNode<Cube>(c);
-                        newChild.Parent = node;
-                        node.Children.Add(newChild);
-                        toPush.Add((newChild, nx, ny, nz));
-                    }
-                }
+                TreeNode<Cube> newChild = new TreeNode<Cube>(c);
+                newChild.Parent = node;
+                node.Children.Add(newChild);
+                toPush.Add((newChild, nx, ny, nz));
             }
 
             for (int t = toPush.Count - 1; t >= 0; t--)

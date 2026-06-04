@@ -10,7 +10,7 @@ public sealed record ConnectionPath(
 
 public class CoherencyConnector
 {
-    public ConnectionPath? ShortestConnection(CubeGrid grid, TreeNode<Cube> componentA, TreeNode<Cube> componentB)
+    private ConnectionPath? ShortestConnection(CubeGrid grid, TreeNode<Cube> componentA, TreeNode<Cube> componentB)
     {
         var coordinates = BuildCoordIndex(grid);
         var aSet = CollectCubes(componentA);

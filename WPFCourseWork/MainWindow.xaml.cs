@@ -421,7 +421,7 @@ public partial class MainWindow : Window
             {
                 using var grid = line.GenerateGridFromLine();
                 var sw = Stopwatch.StartNew();
-                var resultTrees = new Coherency().CreateCT(grid);
+                var resultTrees = Coherency.CreateCt(grid);
                 var map = BuildColorMap(resultTrees);
                 sw.Stop();
                 return (resultTrees, map, sw.ElapsedMilliseconds);
@@ -724,7 +724,7 @@ public partial class MainWindow : Window
             {
                 var sw = Stopwatch.StartNew();
                 using var grid = line.GenerateGridFromLine();
-                var components = new Coherency().CreateCT(grid);
+                var components = Coherency.CreateCt(grid);
 
                 if (components.Count <= 1)
                 {
@@ -761,7 +761,7 @@ public partial class MainWindow : Window
                 }
 
                 using var gridAfter = line.GenerateGridFromLine();
-                var trees = new Coherency().CreateCT(gridAfter);
+                var trees = Coherency.CreateCt(gridAfter);
                 var colorMap = BuildColorMap(trees);
                 sw.Stop();
 
