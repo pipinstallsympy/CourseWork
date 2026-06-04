@@ -9,7 +9,7 @@ public class PermeabilityTreeList
     public PermeabilityTreeList(CubeGrid grid, double fullSideLength)
     {
         Coherency coherency = new Coherency();
-        List<TreeNode<Cube>> nodes = coherency.CreateCT(grid, false);
+        List<TreeNode<Cube>> nodes = Coherency.CreateCt(grid, false);
 
         int n = grid.Count();
         Cube c000 = grid[0][0][0];
@@ -25,8 +25,9 @@ public class PermeabilityTreeList
         foreach (TreeNode<Cube> node in nodes)
         {
             PermeabilityTree tree = new PermeabilityTree(
-                node, fullSideLength,
-                minX, minY, minZ, maxX, maxY, maxZ);
+                node, 
+                minX, minY, minZ,
+                maxX, maxY, maxZ);
             if (tree.edgeNodes.Count > 1 && (tree.PartialPermeability.Count > 0 || tree.EndToEndPermeability.Count > 0))
                 TreeList.Add(tree);
 
@@ -89,7 +90,6 @@ public class PermeabilityTree
 
     public PermeabilityTree(
         TreeNode<Cube> startNode,
-        double fullSideLength,
         double minX, double minY, double minZ,
         double maxX, double maxY, double maxZ)
     {

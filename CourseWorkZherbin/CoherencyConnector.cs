@@ -100,7 +100,7 @@ public class CoherencyConnector
             for (int j = i + 1; j < k; j++)
             {
                 ConnectionPath? p  = ShortestConnection(grid, components[i], components[j]);
-                if (p !=  null) edges.Add(p);
+                if (p != null) edges.Add(p);
             }
         }
         
