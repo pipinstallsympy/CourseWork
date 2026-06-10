@@ -160,7 +160,7 @@ public static class ObjExporter
         }
 
         using var grid = line.GenerateGridFromLine();
-        var mesh = BuildShellMesh(grid, n, cube => cube.IsEmpty, ShouldExportPoreFace);
+        var mesh = BuildPoreMesh(grid, n, skipMaterialBoundary: false);
         WriteMesh(writer, mesh, color.HasValue ? GetPoreMaterialName(color.Value) : null);
     }
 
@@ -187,7 +187,7 @@ public static class ObjExporter
 
         using var grid = line.GenerateGridFromLine();
         var materialMesh = BuildShellMesh(grid, n, cube => !cube.IsEmpty, ShouldExportMaterialFace);
-        var poreMesh = BuildShellMesh(grid, n, cube => cube.IsEmpty, ShouldExportPoreFace);
+        var poreMesh = BuildPoreMesh(grid, n, skipMaterialBoundary: false);
 
         using (var writer = CreateObjFileWriter(filePath))
         {
@@ -237,11 +237,21 @@ public static class ObjExporter
         return n;
     }
 
+    private static ShellMesh BuildPoreMesh(CubeGrid grid, int n, bool skipMaterialBoundary) =>
+        BuildShellMesh(
+            grid,
+            n,
+            cube => cube.IsEmpty,
+            (g, size, i, j, k, ni, nj, nk) =>
+                ShouldExportPoreFace(g, size, i, j, k, ni, nj, nk, skipMaterialBoundary),
+            ShouldReversePoreFaceAtMaterialBoundary);
+
     private static ShellMesh BuildShellMesh(
         CubeGrid grid,
         int n,
         Func<Cube, bool> includeCell,
-        Func<CubeGrid, int, int, int, int, bool> shouldExportFace)
+        Func<CubeGrid, int, int, int, int, int, int, int, bool> shouldExportFace,
+        Func<CubeGrid, int, int, int, int, int, int, int, bool>? shouldReverseWinding = null)
     {
         var vertexKeys = new List<(long x, long y, long z)>();
         var vertexIndex = new Dictionary<(long x, long y, long z), int>();
@@ -264,59 +274,41 @@ public static class ObjExporter
                     double cz = cube.CentralPoint.Z;
                     double h = cube.SideLength * 0.5;
 
-                    if (shouldExportFace(grid, n, i - 1, j, k))
-                    {
-                        AddFace(vertexKeys, vertexIndex, faces,
-                            cx - h, cy - h, cz - h,
-                            cx - h, cy + h, cz - h,
-                            cx - h, cy + h, cz + h,
-                            cx - h, cy - h, cz + h);
-                    }
+                    TryAddFace(grid, n, i, j, k, i - 1, j, k, shouldExportFace, shouldReverseWinding, vertexKeys, vertexIndex, faces,
+                        cx - h, cy - h, cz - h,
+                        cx - h, cy + h, cz - h,
+                        cx - h, cy + h, cz + h,
+                        cx - h, cy - h, cz + h);
 
-                    if (shouldExportFace(grid, n, i + 1, j, k))
-                    {
-                        AddFace(vertexKeys, vertexIndex, faces,
-                            cx + h, cy - h, cz - h,
-                            cx + h, cy + h, cz - h,
-                            cx + h, cy + h, cz + h,
-                            cx + h, cy - h, cz + h);
-                    }
+                    TryAddFace(grid, n, i, j, k, i + 1, j, k, shouldExportFace, shouldReverseWinding, vertexKeys, vertexIndex, faces,
+                        cx + h, cy - h, cz - h,
+                        cx + h, cy + h, cz - h,
+                        cx + h, cy + h, cz + h,
+                        cx + h, cy - h, cz + h);
 
-                    if (shouldExportFace(grid, n, i, j - 1, k))
-                    {
-                        AddFace(vertexKeys, vertexIndex, faces,
-                            cx - h, cy - h, cz - h,
-                            cx + h, cy - h, cz - h,
-                            cx + h, cy - h, cz + h,
-                            cx - h, cy - h, cz + h);
-                    }
+                    TryAddFace(grid, n, i, j, k, i, j - 1, k, shouldExportFace, shouldReverseWinding, vertexKeys, vertexIndex, faces,
+                        cx - h, cy - h, cz - h,
+                        cx + h, cy - h, cz - h,
+                        cx + h, cy - h, cz + h,
+                        cx - h, cy - h, cz + h);
 
-                    if (shouldExportFace(grid, n, i, j + 1, k))
-                    {
-                        AddFace(vertexKeys, vertexIndex, faces,
-                            cx - h, cy + h, cz - h,
-                            cx + h, cy + h, cz - h,
-                            cx + h, cy + h, cz + h,
-                            cx - h, cy + h, cz + h);
-                    }
+                    TryAddFace(grid, n, i, j, k, i, j + 1, k, shouldExportFace, shouldReverseWinding, vertexKeys, vertexIndex, faces,
+                        cx - h, cy + h, cz - h,
+                        cx + h, cy + h, cz - h,
+                        cx + h, cy + h, cz + h,
+                        cx - h, cy + h, cz + h);
 
-                    if (shouldExportFace(grid, n, i, j, k - 1))
-                    {
-                        AddFace(vertexKeys, vertexIndex, faces,
-                            cx - h, cy - h, cz - h,
-                            cx + h, cy - h, cz - h,
-                            cx + h, cy + h, cz - h,
-                            cx - h, cy + h, cz - h);
-                    }
+                    TryAddFace(grid, n, i, j, k, i, j, k - 1, shouldExportFace, shouldReverseWinding, vertexKeys, vertexIndex, faces,
+                        cx - h, cy - h, cz - h,
+                        cx + h, cy - h, cz - h,
+                        cx + h, cy + h, cz - h,
+                        cx - h, cy + h, cz - h);
 
-                    if (shouldExportFace(grid, n, i, j, k + 1))
-                    {
-                        AddFace(vertexKeys, vertexIndex, faces,
-                            cx - h, cy - h, cz + h,
-                            cx + h, cy - h, cz + h,
-                            cx + h, cy + h, cz + h,
-                            cx - h, cy + h, cz + h);
-                    }
+                    TryAddFace(grid, n, i, j, k, i, j, k + 1, shouldExportFace, shouldReverseWinding, vertexKeys, vertexIndex, faces,
+                        cx - h, cy - h, cz + h,
+                        cx + h, cy - h, cz + h,
+                        cx + h, cy + h, cz + h,
+                        cx - h, cy + h, cz + h);
                 }
             }
         }
@@ -428,8 +420,18 @@ public static class ObjExporter
         writer.WriteLine("illum 2");
     }
 
-    private static bool ShouldExportMaterialFace(CubeGrid grid, int n, int ni, int nj, int nk)
+    private static bool ShouldExportMaterialFace(
+        CubeGrid grid,
+        int n,
+        int i,
+        int j,
+        int k,
+        int ni,
+        int nj,
+        int nk)
     {
+        _ = (i, j, k);
+
         if (ni < 0 || ni >= n || nj < 0 || nj >= n || nk < 0 || nk >= n)
         {
             return true;
@@ -438,20 +440,98 @@ public static class ObjExporter
         return grid.Grid[ni][nj][nk].IsEmpty;
     }
 
-    private static bool ShouldExportPoreFace(CubeGrid grid, int n, int ni, int nj, int nk)
+    private static bool ShouldExportPoreFace(
+        CubeGrid grid,
+        int n,
+        int i,
+        int j,
+        int k,
+        int ni,
+        int nj,
+        int nk,
+        bool skipMaterialBoundary)
     {
         if (ni < 0 || ni >= n || nj < 0 || nj >= n || nk < 0 || nk >= n)
         {
             return true;
         }
 
+        if (!grid.Grid[ni][nj][nk].IsEmpty)
+        {
+            return !skipMaterialBoundary;
+        }
+
+        return CompareCell(i, j, k, ni, nj, nk) < 0;
+    }
+
+    private static bool ShouldReversePoreFaceAtMaterialBoundary(
+        CubeGrid grid,
+        int n,
+        int i,
+        int j,
+        int k,
+        int ni,
+        int nj,
+        int nk)
+    {
+        _ = (i, j, k);
+
+        if (ni < 0 || ni >= n || nj < 0 || nj >= n || nk < 0 || nk >= n)
+        {
+            return false;
+        }
+
         return !grid.Grid[ni][nj][nk].IsEmpty;
+    }
+
+    private static int CompareCell(int i, int j, int k, int ni, int nj, int nk)
+    {
+        if (i != ni)
+        {
+            return i.CompareTo(ni);
+        }
+
+        if (j != nj)
+        {
+            return j.CompareTo(nj);
+        }
+
+        return k.CompareTo(nk);
+    }
+
+    private static void TryAddFace(
+        CubeGrid grid,
+        int n,
+        int i,
+        int j,
+        int k,
+        int ni,
+        int nj,
+        int nk,
+        Func<CubeGrid, int, int, int, int, int, int, int, bool> shouldExportFace,
+        Func<CubeGrid, int, int, int, int, int, int, int, bool>? shouldReverseWinding,
+        List<(long x, long y, long z)> vertexKeys,
+        Dictionary<(long x, long y, long z), int> vertexIndex,
+        List<(int a, int b, int c)> faces,
+        double x1, double y1, double z1,
+        double x2, double y2, double z2,
+        double x3, double y3, double z3,
+        double x4, double y4, double z4)
+    {
+        if (!shouldExportFace(grid, n, i, j, k, ni, nj, nk))
+        {
+            return;
+        }
+
+        bool reverseWinding = shouldReverseWinding?.Invoke(grid, n, i, j, k, ni, nj, nk) ?? false;
+        AddFace(vertexKeys, vertexIndex, faces, reverseWinding, x1, y1, z1, x2, y2, z2, x3, y3, z3, x4, y4, z4);
     }
 
     private static void AddFace(
         List<(long x, long y, long z)> vertexKeys,
         Dictionary<(long x, long y, long z), int> vertexIndex,
         List<(int a, int b, int c)> faces,
+        bool reverseWinding,
         double x1, double y1, double z1,
         double x2, double y2, double z2,
         double x3, double y3, double z3,
@@ -462,8 +542,16 @@ public static class ObjExporter
         int i3 = GetOrAddVertex(vertexKeys, vertexIndex, x3, y3, z3);
         int i4 = GetOrAddVertex(vertexKeys, vertexIndex, x4, y4, z4);
 
-        faces.Add((i1, i2, i3));
-        faces.Add((i1, i3, i4));
+        if (reverseWinding)
+        {
+            faces.Add((i1, i3, i2));
+            faces.Add((i1, i4, i3));
+        }
+        else
+        {
+            faces.Add((i1, i2, i3));
+            faces.Add((i1, i3, i4));
+        }
     }
 
     private static int GetOrAddVertex(

@@ -28,6 +28,78 @@ public class UnitTestObjExporter
         return (vertices, faces, content);
     }
 
+    private static (int solidFaces, int poreFaces) CountCombinedFacesByMaterial(string content)
+    {
+        int solidFaces = 0;
+        int poreFaces = 0;
+        bool inSolid = false;
+        bool inPore = false;
+
+        foreach (string line in content.Split('\n'))
+        {
+            if (line.StartsWith("usemtl solid_", StringComparison.Ordinal))
+            {
+                inSolid = true;
+                inPore = false;
+                continue;
+            }
+
+            if (line.StartsWith("usemtl pore_", StringComparison.Ordinal))
+            {
+                inSolid = false;
+                inPore = true;
+                continue;
+            }
+
+            if (!line.StartsWith("f ", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            if (inSolid)
+            {
+                solidFaces++;
+            }
+            else if (inPore)
+            {
+                poreFaces++;
+            }
+        }
+
+        return (solidFaces, poreFaces);
+    }
+
+    private static HashSet<string> GetFaceQuadsByMaterial(string content, string materialPrefix)
+    {
+        var quads = new HashSet<string>();
+        bool inMaterial = false;
+
+        foreach (string line in content.Split('\n'))
+        {
+            if (line.StartsWith("usemtl ", StringComparison.Ordinal))
+            {
+                inMaterial = line.StartsWith($"usemtl {materialPrefix}", StringComparison.Ordinal);
+                continue;
+            }
+
+            if (!inMaterial || !line.StartsWith("f ", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            string[] parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length < 4)
+            {
+                continue;
+            }
+
+            var vertices = new[] { parts[1], parts[2], parts[3] }.OrderBy(v => v, StringComparer.Ordinal).ToArray();
+            quads.Add($"{vertices[0]}|{vertices[1]}|{vertices[2]}");
+        }
+
+        return quads;
+    }
+
     [Fact]
     public void ExportMaterial_2x2x2WithoutPores_Produces48Triangles()
     {
@@ -92,15 +164,15 @@ public class UnitTestObjExporter
     }
 
     [Fact]
-    public void ExportPores_2x2x2AllPores_Produces48Triangles()
+    public void ExportPores_2x2x2AllPores_Produces72Triangles()
     {
         using var grid = new CubeGrid(2, isEmpty: true);
         var line = grid.GenerateLineFromGrid()!;
 
         var (vertices, faces, content) = ExportPoresToString(line);
 
-        Assert.Equal(48, faces);
-        Assert.InRange(vertices, 8, 26);
+        Assert.Equal(72, faces);
+        Assert.Equal(27, vertices);
         Assert.StartsWith("# CourseWorkZherbin pores export", content);
     }
 
@@ -148,6 +220,79 @@ public class UnitTestObjExporter
 
         using var writer = new StringWriter();
         Assert.Throws<ArgumentException>(() => ObjExporter.ExportPores(line, writer));
+    }
+
+    [Fact]
+    public void ExportCombined_SinglePore_ExportsPoreFacesAtMaterialBoundary()
+    {
+        using var grid = new CubeGrid(3);
+        var line = grid.GenerateLineFromGrid()!;
+        line[line.Count() / 2].IsEmpty = true;
+
+        string objPath = Path.Combine(Path.GetTempPath(), $"combined_{Guid.NewGuid():N}.obj");
+        try
+        {
+            ObjExporter.ExportCombined(line, objPath);
+            string content = File.ReadAllText(objPath);
+            var (_, poreFaces) = CountCombinedFacesByMaterial(content);
+
+            Assert.Equal(12, poreFaces);
+        }
+        finally
+        {
+            File.Delete(objPath);
+            string mtlPath = Path.ChangeExtension(objPath, ".mtl");
+            if (File.Exists(mtlPath))
+            {
+                File.Delete(mtlPath);
+            }
+        }
+    }
+
+    [Fact]
+    public void ExportPores_TwoAdjacentPores_OneSharedFace()
+    {
+        using var grid = new CubeGrid(2);
+        var line = grid.GenerateLineFromGrid()!;
+        line[0].IsEmpty = true;
+        line[1].IsEmpty = true;
+
+        var (_, faces, _) = ExportPoresToString(line);
+
+        Assert.Equal(22, faces);
+        Assert.NotEqual(24, faces);
+    }
+
+    [Fact]
+    public void ExportCombined_MaterialPoreBoundary_HasCoplanarFacesOnBothSides()
+    {
+        using var grid = new CubeGrid(3);
+        var line = grid.GenerateLineFromGrid()!;
+        line[line.Count() / 2].IsEmpty = true;
+
+        string objPath = Path.Combine(Path.GetTempPath(), $"combined_{Guid.NewGuid():N}.obj");
+        try
+        {
+            ObjExporter.ExportCombined(line, objPath);
+            string content = File.ReadAllText(objPath);
+
+            var (solidFaces, poreFaces) = CountCombinedFacesByMaterial(content);
+            var solidTriangles = GetFaceQuadsByMaterial(content, "solid_");
+            var poreTriangles = GetFaceQuadsByMaterial(content, "pore_");
+
+            Assert.True(solidFaces > 0);
+            Assert.Equal(12, poreFaces);
+            Assert.NotEmpty(solidTriangles.Intersect(poreTriangles));
+        }
+        finally
+        {
+            File.Delete(objPath);
+            string mtlPath = Path.ChangeExtension(objPath, ".mtl");
+            if (File.Exists(mtlPath))
+            {
+                File.Delete(mtlPath);
+            }
+        }
     }
 
     [Fact]
