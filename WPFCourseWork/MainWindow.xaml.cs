@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.IO;
 using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
@@ -8,12 +9,19 @@ using System.Windows.Threading;
 using CourseWorkZherbin;
 using Point = CourseWorkZherbin.Point;
 using HelixToolkit.Wpf.SharpDX;
+using WPFCourseWork.Controls;
 using WPFCourseWork.Rendering;
 
 namespace WPFCourseWork;
 
 public partial class MainWindow : Window
 {
+    private enum ExportColorTarget
+    {
+        Material,
+        Pore
+    }
+
     private static List<TreeNode<Cube>> coherenceTreeList = new List<TreeNode<Cube>>();
 
     private readonly IEffectsManager _effectsManager = new DefaultEffectsManager();
@@ -46,6 +54,7 @@ public partial class MainWindow : Window
     private bool _coherencyCalculationInProgress;
     private CancellationTokenSource? _coherencyCts;
     private int _objectGeneration;
+    private ExportColorTarget _activeExportColorTarget = ExportColorTarget.Material;
 
     public MainWindow()
     {
@@ -59,6 +68,10 @@ public partial class MainWindow : Window
         MethodsPanel.SelectionChanged += OnSelectionChanged;
         Viewport.PreviewMouseLeftButtonDown += OnViewport3DClick;
         Viewport.Loaded += (_, _) => ConfigureTopDownCamera();
+        UpdateExportColorVisibility();
+        ExportModeHintText.Text = ExportWithColorCheckBox.IsChecked == true
+            ? "Сохраняются только воксели материала с выбранным цветом (файл MTL создаётся рядом)."
+            : "Сохраняются только воксели материала (без пор).";
     }
 
     private void ConfigureViewportChrome()
@@ -524,6 +537,297 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             MessageBox.Show(ex.Message);
+        }
+    }
+
+    private void OnExportModeChanged(object sender, RoutedEventArgs e)
+    {
+        if (ExportModeHintText == null) return;
+
+        UpdateExportColorVisibility();
+
+        if (ExportCombinedRadio.IsChecked == true)
+        {
+            ExportModeHintText.Text =
+                "Сохраняются материал и поры в одном OBJ с разными цветами (файл MTL создаётся рядом).";
+        }
+        else if (ExportPoresOnlyRadio.IsChecked == true)
+        {
+            ExportModeHintText.Text = ExportWithColorCheckBox.IsChecked == true
+                ? "Сохраняются только воксели пор с выбранным цветом (файл MTL создаётся рядом)."
+                : "Сохраняются только воксели пор (без материала).";
+        }
+        else
+        {
+            ExportModeHintText.Text = ExportWithColorCheckBox.IsChecked == true
+                ? "Сохраняются только воксели материала с выбранным цветом (файл MTL создаётся рядом)."
+                : "Сохраняются только воксели материала (без пор).";
+        }
+    }
+
+    private void OnExportColorOptionChanged(object sender, RoutedEventArgs e)
+    {
+        UpdateExportColorVisibility();
+        OnExportModeChanged(sender, e);
+    }
+
+    private void UpdateExportColorVisibility()
+    {
+        if (ExportWithColorCheckBox == null || ExportMaterialColorRow == null || ExportPoreColorRow == null)
+        {
+            return;
+        }
+
+        var mode = GetSelectedExportMode();
+        bool includeColor = ExportWithColorCheckBox.IsChecked == true;
+
+        ExportWithColorCheckBox.Visibility = mode == ObjExportMode.Combined
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+
+        ExportMaterialColorRow.Visibility = mode switch
+        {
+            ObjExportMode.Combined => Visibility.Visible,
+            ObjExportMode.MaterialOnly when includeColor => Visibility.Visible,
+            _ => Visibility.Collapsed
+        };
+
+        ExportPoreColorRow.Visibility = mode switch
+        {
+            ObjExportMode.Combined => Visibility.Visible,
+            ObjExportMode.PoresOnly when includeColor => Visibility.Visible,
+            _ => Visibility.Collapsed
+        };
+    }
+
+    private void OnExportMaterialColorSwatchClick(object sender, MouseButtonEventArgs e)
+    {
+        _activeExportColorTarget = ExportColorTarget.Material;
+        if (ExportColorPickerPopup.IsOpen &&
+            ReferenceEquals(ExportColorPickerPopup.PlacementTarget, ExportMaterialColorSwatch))
+        {
+            ExportColorPickerPopup.IsOpen = false;
+            return;
+        }
+
+        ExportColorPickerPopup.ShowFor(ExportMaterialColorSwatch, GetExportMaterialColor());
+    }
+
+    private void OnExportPoreColorSwatchClick(object sender, MouseButtonEventArgs e)
+    {
+        _activeExportColorTarget = ExportColorTarget.Pore;
+        if (ExportColorPickerPopup.IsOpen &&
+            ReferenceEquals(ExportColorPickerPopup.PlacementTarget, ExportPoreColorSwatch))
+        {
+            ExportColorPickerPopup.IsOpen = false;
+            return;
+        }
+
+        ExportColorPickerPopup.ShowFor(ExportPoreColorSwatch, GetExportPoreColor());
+    }
+
+    private void OnExportColorPickerColorChanged(object sender, Color color)
+    {
+        ApplyExportColor(_activeExportColorTarget, color, updateHex: true);
+    }
+
+    private void OnExportMaterialColorHexLostFocus(object sender, RoutedEventArgs e)
+    {
+        TryApplyExportColorFromHex(ExportColorTarget.Material, ExportMaterialColorHex.Text);
+    }
+
+    private void OnExportPoreColorHexLostFocus(object sender, RoutedEventArgs e)
+    {
+        TryApplyExportColorFromHex(ExportColorTarget.Pore, ExportPoreColorHex.Text);
+    }
+
+    private void OnExportColorHexKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter || sender is not TextBox textBox)
+        {
+            return;
+        }
+
+        var target = ReferenceEquals(textBox, ExportMaterialColorHex)
+            ? ExportColorTarget.Material
+            : ExportColorTarget.Pore;
+        TryApplyExportColorFromHex(target, textBox.Text);
+        e.Handled = true;
+    }
+
+    private Color GetExportMaterialColor()
+    {
+        return ColorUtils.TryParseHexColor(ExportMaterialColorHex.Text, out Color color)
+            ? color
+            : Color.FromRgb(0xCC, 0x22, 0x22);
+    }
+
+    private Color GetExportPoreColor()
+    {
+        return ColorUtils.TryParseHexColor(ExportPoreColorHex.Text, out Color color)
+            ? color
+            : Color.FromRgb(0x8F, 0xBC, 0x8F);
+    }
+
+    private void ApplyExportColor(ExportColorTarget target, Color color, bool updateHex)
+    {
+        if (target == ExportColorTarget.Material)
+        {
+            ExportMaterialColorSwatch.Background = new SolidColorBrush(color);
+            if (updateHex)
+            {
+                ExportMaterialColorHex.Text = ColorUtils.ColorToHex(color);
+            }
+
+            SetHexBoxValid(ExportMaterialColorHex, isValid: true);
+            return;
+        }
+
+        ExportPoreColorSwatch.Background = new SolidColorBrush(color);
+        if (updateHex)
+        {
+            ExportPoreColorHex.Text = ColorUtils.ColorToHex(color);
+        }
+
+        SetHexBoxValid(ExportPoreColorHex, isValid: true);
+    }
+
+    private void TryApplyExportColorFromHex(ExportColorTarget target, string hex)
+    {
+        if (!ColorUtils.TryParseHexColor(hex, out Color color))
+        {
+            var textBox = target == ExportColorTarget.Material
+                ? ExportMaterialColorHex
+                : ExportPoreColorHex;
+            SetHexBoxValid(textBox, isValid: false);
+            return;
+        }
+
+        ApplyExportColor(target, color, updateHex: true);
+    }
+
+    private static void SetHexBoxValid(TextBox textBox, bool isValid)
+    {
+        textBox.BorderBrush = isValid
+            ? SystemColors.ControlDarkBrush
+            : Brushes.IndianRed;
+    }
+
+    private bool TryBuildExportSettings(out ObjExportSettings settings)
+    {
+        settings = default!;
+        var mode = GetSelectedExportMode();
+        bool includeColor = ExportWithColorCheckBox.IsChecked == true;
+
+        if (!ObjColor.TryParseHex(ExportMaterialColorHex.Text, out ObjColor materialColor))
+        {
+            if (mode is ObjExportMode.MaterialOnly or ObjExportMode.Combined &&
+                (mode == ObjExportMode.Combined || includeColor))
+            {
+                MessageBox.Show("Некорректный hex-цвет материала.", "Сохранение",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                SetHexBoxValid(ExportMaterialColorHex, isValid: false);
+                return false;
+            }
+
+            materialColor = ObjColor.DefaultMaterial;
+        }
+
+        if (!ObjColor.TryParseHex(ExportPoreColorHex.Text, out ObjColor poreColor))
+        {
+            if (mode is ObjExportMode.PoresOnly or ObjExportMode.Combined &&
+                (mode == ObjExportMode.Combined || includeColor))
+            {
+                MessageBox.Show("Некорректный hex-цвет пор.", "Сохранение",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                SetHexBoxValid(ExportPoreColorHex, isValid: false);
+                return false;
+            }
+
+            poreColor = ObjColor.DefaultPore;
+        }
+
+        settings = new ObjExportSettings(
+            mode,
+            materialColor,
+            poreColor,
+            IncludeMaterialColor: mode == ObjExportMode.Combined ||
+                                  (mode == ObjExportMode.MaterialOnly && includeColor),
+            IncludePoreColor: mode == ObjExportMode.Combined ||
+                              (mode == ObjExportMode.PoresOnly && includeColor));
+
+        return true;
+    }
+
+    private ObjExportMode GetSelectedExportMode()
+    {
+        if (ExportPoresOnlyRadio.IsChecked == true)
+        {
+            return ObjExportMode.PoresOnly;
+        }
+
+        if (ExportCombinedRadio.IsChecked == true)
+        {
+            return ObjExportMode.Combined;
+        }
+
+        return ObjExportMode.MaterialOnly;
+    }
+
+    private void OnSaveObj(object sender, RoutedEventArgs e)
+    {
+        if (_currentLine == null)
+        {
+            MessageBox.Show("Сначала сгенерируйте объект", "Сохранение",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var mode = GetSelectedExportMode();
+        var (dialogTitle, defaultFileName) = mode switch
+        {
+            ObjExportMode.PoresOnly => ("Сохранить поры как OBJ", "pores.obj"),
+            ObjExportMode.Combined => ("Сохранить материал и поры как OBJ", "combined.obj"),
+            _ => ("Сохранить материал как OBJ", "material.obj")
+        };
+
+        var dialog = new Microsoft.Win32.SaveFileDialog
+        {
+            Title = dialogTitle,
+            Filter = "Wavefront OBJ (*.obj)|*.obj",
+            DefaultExt = "obj",
+            FileName = defaultFileName,
+            AddExtension = true,
+            OverwritePrompt = true
+        };
+
+        if (dialog.ShowDialog() != true) return;
+
+        if (!TryBuildExportSettings(out ObjExportSettings settings))
+        {
+            return;
+        }
+
+        try
+        {
+            CourseWorkZherbin.ObjExporter.Export(_currentLine, dialog.FileName, settings);
+
+            string successMessage = settings.WritesMtlFile
+                ? $"Файлы сохранены:\n{dialog.FileName}\n{Path.ChangeExtension(dialog.FileName, ".mtl")}\n\n" +
+                  "Импорт в Blender:\n" +
+                  "• File → Import → Wavefront (.obj)\n" +
+                  "• Выберите только файл .obj (не .mtl)\n" +
+                  "• Файл .mtl должен лежать в той же папке\n" +
+                  "• Name Collision: Replace (или новая сцена)"
+                : $"Файл сохранён:\n{dialog.FileName}";
+
+            MessageBox.Show(successMessage, "Сохранение",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(ex.Message, "Ошибка сохранения",
+                MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 

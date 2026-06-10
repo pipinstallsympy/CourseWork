@@ -4,6 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:hx="http://helix-toolkit.org/wpf/SharpDX"
+        xmlns:controls="clr-namespace:WPFCourseWork.Controls"
         mc:Ignorable="d"
         Title="Course Work Zherbin" Height="540" Width="960" WindowStyle="ThreeDBorderWindow">
     <Grid Name="MainRoot" Background="White">
@@ -233,6 +234,115 @@
                     <TextBlock x:Name="PercolationStatsHasThrough" Text="Сквозная перколяция: -" Margin="0,4,0,0"/>
                     <TextBlock x:Name="PercolationStatsTreeDepth" Text="Глубина октодерева: -" Margin="0,4,0,0"/>
                 </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <TabItem x:Name="FileTabItem" Header="Файл">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="0,8,0,0">
+                        <TextBlock Text="Экспорт в файл Wavefront OBJ."
+                                   TextWrapping="Wrap"/>
+
+                        <TextBlock Text="Что сохранять:"
+                                   Margin="0,12,0,0"
+                                   TextWrapping="Wrap"/>
+
+                        <RadioButton x:Name="ExportMaterialOnlyRadio"
+                                     Content="Только материал"
+                                     IsChecked="True"
+                                     Margin="0,8,0,0"
+                                     Checked="OnExportModeChanged"
+                                     Unchecked="OnExportModeChanged"/>
+                        <RadioButton x:Name="ExportPoresOnlyRadio"
+                                     Content="Только поры"
+                                     Margin="0,4,0,0"
+                                     Checked="OnExportModeChanged"
+                                     Unchecked="OnExportModeChanged"/>
+                        <RadioButton x:Name="ExportCombinedRadio"
+                                     Content="Материал и поры (разные цвета)"
+                                     Margin="0,4,0,0"
+                                     Checked="OnExportModeChanged"
+                                     Unchecked="OnExportModeChanged"/>
+
+                        <CheckBox x:Name="ExportWithColorCheckBox"
+                                  Content="Экспортировать с цветом"
+                                  IsChecked="True"
+                                  Margin="0,12,0,0"
+                                  Checked="OnExportColorOptionChanged"
+                                  Unchecked="OnExportColorOptionChanged"/>
+
+                        <StackPanel x:Name="ExportMaterialColorRow"
+                                    Orientation="Horizontal"
+                                    Margin="0,8,0,0"
+                                    VerticalAlignment="Center"
+                                    Visibility="Collapsed">
+                            <TextBlock Text="Материал:"
+                                       Width="72"
+                                       VerticalAlignment="Center"/>
+                            <Border x:Name="ExportMaterialColorSwatch"
+                                    Width="20"
+                                    Height="20"
+                                    BorderBrush="Gray"
+                                    BorderThickness="1"
+                                    Background="#CC2222"
+                                    Cursor="Hand"
+                                    MouseLeftButtonUp="OnExportMaterialColorSwatchClick"/>
+                            <TextBox x:Name="ExportMaterialColorHex"
+                                     Width="72"
+                                     Margin="8,0,0,0"
+                                     FontFamily="Consolas"
+                                     Text="#CC2222"
+                                     LostFocus="OnExportMaterialColorHexLostFocus"
+                                     KeyDown="OnExportColorHexKeyDown"/>
+                        </StackPanel>
+
+                        <StackPanel x:Name="ExportPoreColorRow"
+                                    Orientation="Horizontal"
+                                    Margin="0,6,0,0"
+                                    VerticalAlignment="Center"
+                                    Visibility="Collapsed">
+                            <TextBlock Text="Поры:"
+                                       Width="72"
+                                       VerticalAlignment="Center"/>
+                            <Border x:Name="ExportPoreColorSwatch"
+                                    Width="20"
+                                    Height="20"
+                                    BorderBrush="Gray"
+                                    BorderThickness="1"
+                                    Background="#8FBC8F"
+                                    Cursor="Hand"
+                                    MouseLeftButtonUp="OnExportPoreColorSwatchClick"/>
+                            <TextBox x:Name="ExportPoreColorHex"
+                                     Width="72"
+                                     Margin="8,0,0,0"
+                                     FontFamily="Consolas"
+                                     Text="#8FBC8F"
+                                     LostFocus="OnExportPoreColorHexLostFocus"
+                                     KeyDown="OnExportColorHexKeyDown"/>
+                        </StackPanel>
+
+                        <controls:ColorPickerPopup x:Name="ExportColorPickerPopup"
+                                                   ColorChanged="OnExportColorPickerColorChanged"/>
+
+                        <TextBlock x:Name="ExportModeHintText"
+                                   Text="Сохраняются только воксели материала (без пор)."
+                                   Margin="0,8,0,0"
+                                   TextWrapping="Wrap"
+                                   FontSize="11"
+                                   Foreground="Gray"/>
+
+                        <TextBlock Text="Blender: импортируйте только .obj (не .mtl). Файл .mtl — рядом с .obj."
+                                   Margin="0,6,0,0"
+                                   TextWrapping="Wrap"
+                                   FontSize="11"
+                                   Foreground="Gray"/>
+
+                        <Button x:Name="SaveObjButton"
+                                Content="Сохранить в OBJ..."
+                                Margin="0,12,0,0"
+                                Height="30"
+                                Click="OnSaveObj"/>
+                    </StackPanel>
                 </ScrollViewer>
             </TabItem>
         </TabControl>
