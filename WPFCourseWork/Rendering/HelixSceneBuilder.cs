@@ -220,6 +220,12 @@ public static class HelixSceneBuilder
         };
     }
 
+    public static void ApplyPoreAppearance(MeshGeometryModel3D mesh, WpfColor color, double opacity)
+    {
+        mesh.Material = GetOrCreateMaterial(color, opacity);
+        mesh.IsTransparent = opacity < 1.0;
+    }
+
     private static (double minX, double minY, double minZ, double maxX, double maxY, double maxZ) ComputeBounds(CubeLine line)
     {
         var first = line[0];
