@@ -1,3 +1,5 @@
+using System.Threading;
+
 namespace CourseWorkZherbin;
 
 public class Coherency
@@ -12,14 +14,19 @@ public class Coherency
         (0, 0, 1),
     };
     
-    public static List<TreeNode<Cube>> CreateCt(CubeGrid g, bool isMaterial = true)
+    public static List<TreeNode<Cube>> CreateCt(
+        CubeGrid g,
+        bool isMaterial = true,
+        CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         int n = g.Count();
         bool[,,] visited = new bool[n, n, n];
         List<TreeNode<Cube>> nodes = new List<TreeNode<Cube>>();
 
         for (int i = 0; i < n; i++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             for (int j = 0; j < n; j++)
             {
                 for (int k = 0; k < n; k++)
@@ -31,7 +38,7 @@ public class Coherency
                     visited[i, j, k] = true;
                     TreeNode<Cube> node = new TreeNode<Cube>(cube);
                     nodes.Add(node);
-                    IterativeCt(g, visited, isMaterial, n, node, i, j, k);
+                    IterativeCt(g, visited, isMaterial, n, node, i, j, k, cancellationToken);
                 }
             }
         }
@@ -47,7 +54,8 @@ public class Coherency
         TreeNode<Cube> root,
         int rootX,
         int rootY,
-        int rootZ)
+        int rootZ,
+        CancellationToken cancellationToken)
     {
         var stack = new Stack<(TreeNode<Cube> node, int x, int y, int z)>();
         var toPush = new List<(TreeNode<Cube> node, int x, int y, int z)>();
@@ -55,6 +63,7 @@ public class Coherency
 
         while (stack.Count > 0)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var (node, x, y, z) = stack.Pop();
             toPush.Clear();
 

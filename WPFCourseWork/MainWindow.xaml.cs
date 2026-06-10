@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -43,6 +44,8 @@ public partial class MainWindow : Window
 
     private const int CoherencyPartitionWarningThreshold = 48;
     private bool _coherencyCalculationInProgress;
+    private CancellationTokenSource? _coherencyCts;
+    private int _objectGeneration;
 
     public MainWindow()
     {
@@ -362,6 +365,8 @@ public partial class MainWindow : Window
 
     private void StoreGeneratedLine(CubeLine? liney)
     {
+        _objectGeneration++;
+        CancelCoherencyWork();
         _currentLine = liney;
         coherenceTreeList = new List<TreeNode<Cube>>();
         _cubeColorMap = null;
@@ -405,6 +410,31 @@ public partial class MainWindow : Window
             StatsCoherencyCount.Text = "Связных компонент: идёт расчёт…";
     }
 
+    private void CancelCoherencyWork()
+    {
+        if (_coherencyCts == null) return;
+        _coherencyCts.Cancel();
+        _coherencyCts.Dispose();
+        _coherencyCts = null;
+        SetCoherencyBusy(false);
+    }
+
+    private CancellationTokenSource BeginCoherencyWork()
+    {
+        CancelCoherencyWork();
+        _coherencyCts = new CancellationTokenSource();
+        SetCoherencyBusy(true);
+        return _coherencyCts;
+    }
+
+    private void EndCoherencyWork(CancellationTokenSource cts)
+    {
+        if (!ReferenceEquals(_coherencyCts, cts)) return;
+        _coherencyCts.Dispose();
+        _coherencyCts = null;
+        SetCoherencyBusy(false);
+    }
+
     private async void OnCheckCoherency(object sender, RoutedEventArgs e)
     {
         if (_currentLine == null)
@@ -419,18 +449,22 @@ public partial class MainWindow : Window
         if (!ConfirmLargePartitionOperation(partition, connectComponents: false)) return;
 
         var line = _currentLine;
-        SetCoherencyBusy(true);
+        var cts = BeginCoherencyWork();
+        var token = cts.Token;
+        var generation = _objectGeneration;
         try
         {
             var (trees, colorMap, elapsedMs) = await Task.Run(() =>
             {
                 using var grid = line.GenerateGridFromLine();
                 var sw = Stopwatch.StartNew();
-                var resultTrees = Coherency.CreateCt(grid);
+                var resultTrees = Coherency.CreateCt(grid, cancellationToken: token);
                 var map = BuildColorMap(resultTrees);
                 sw.Stop();
                 return (resultTrees, map, sw.ElapsedMilliseconds);
-            });
+            }, token);
+
+            if (generation != _objectGeneration) return;
 
             coherenceTreeList = trees;
             _cubeColorMap = colorMap;
@@ -438,13 +472,16 @@ public partial class MainWindow : Window
             StatsCoherencyCount.Text = $"Связных компонент: {coherenceTreeList.Count}";
             RedrawCubes();
         }
-        catch (Exception ex)
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex) when (generation == _objectGeneration)
         {
             MessageBox.Show(ex.Message);
         }
         finally
         {
-            SetCoherencyBusy(false);
+            EndCoherencyWork(cts);
         }
     }
 
@@ -828,62 +865,16 @@ public partial class MainWindow : Window
 
         var line = _currentLine;
         bool preserveMaterial = PreserveMaterialCheckBox?.IsChecked == true;
-        SetCoherencyBusy(true);
+        var cts = BeginCoherencyWork();
+        var token = cts.Token;
+        var generation = _objectGeneration;
         try
         {
-            var workResult = await Task.Run(() =>
-            {
-                var sw = Stopwatch.StartNew();
-                using var grid = line.GenerateGridFromLine();
-                var components = Coherency.CreateCt(grid);
+            var workResult = await Task.Run(
+                () => RunConnectComponentsWork(line, preserveMaterial, token),
+                token);
 
-                if (components.Count <= 1)
-                {
-                    sw.Stop();
-                    return new ConnectComponentsWorkResult
-                    {
-                        AlreadyConnected = true,
-                        ElapsedMs = sw.ElapsedMilliseconds
-                    };
-                }
-
-                var bridges = new CoherencyConnector().ConnectAll(grid, components);
-
-                var distinctBridgeCubes = new HashSet<Cube>();
-                foreach (var b in bridges)
-                {
-                    foreach (var c in b.EmptyCubesToFill)
-                        distinctBridgeCubes.Add(c);
-                }
-
-                int bridgeCubesCount = distinctBridgeCubes.Count;
-                int leavesShortage = 0;
-
-                if (preserveMaterial && bridgeCubesCount > 0)
-                {
-                    var forbidden = BuildForbiddenSet(grid, distinctBridgeCubes);
-                    int removed = RemoveLeavesCascade(components, forbidden, bridgeCubesCount);
-                    leavesShortage = bridgeCubesCount - removed;
-                }
-
-                foreach (var cube in distinctBridgeCubes)
-                {
-                    if (cube.IsEmpty) cube.IsEmpty = false;
-                }
-
-                using var gridAfter = line.GenerateGridFromLine();
-                var trees = Coherency.CreateCt(gridAfter);
-                var colorMap = BuildColorMap(trees);
-                sw.Stop();
-
-                return new ConnectComponentsWorkResult
-                {
-                    Trees = trees,
-                    ColorMap = colorMap,
-                    ElapsedMs = sw.ElapsedMilliseconds,
-                    LeavesShortage = leavesShortage
-                };
-            });
+            if (generation != _objectGeneration) return;
 
             if (workResult.AlreadyConnected)
             {
@@ -909,20 +900,81 @@ public partial class MainWindow : Window
                     $"{workResult.LeavesShortage} соединяющих узлов добавлены без компенсации.");
             }
         }
-        catch (Exception ex)
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex) when (generation == _objectGeneration)
         {
             MessageBox.Show(ex.Message);
         }
         finally
         {
-            SetCoherencyBusy(false);
+            EndCoherencyWork(cts);
         }
+    }
+
+    private static ConnectComponentsWorkResult RunConnectComponentsWork(
+        CubeLine line,
+        bool preserveMaterial,
+        CancellationToken token)
+    {
+        var sw = Stopwatch.StartNew();
+        using var grid = line.GenerateGridFromLine();
+        var components = Coherency.CreateCt(grid, cancellationToken: token);
+
+        if (components.Count <= 1)
+        {
+            sw.Stop();
+            return new ConnectComponentsWorkResult
+            {
+                AlreadyConnected = true,
+                ElapsedMs = sw.ElapsedMilliseconds
+            };
+        }
+
+        var bridges = new CoherencyConnector().ConnectAll(grid, components, token);
+
+        var distinctBridgeCubes = new HashSet<Cube>();
+        foreach (var b in bridges)
+        {
+            foreach (var c in b.EmptyCubesToFill)
+                distinctBridgeCubes.Add(c);
+        }
+
+        int bridgeCubesCount = distinctBridgeCubes.Count;
+        int leavesShortage = 0;
+
+        if (preserveMaterial && bridgeCubesCount > 0)
+        {
+            var forbidden = BuildForbiddenSet(grid, distinctBridgeCubes);
+            int removed = RemoveLeavesCascade(components, forbidden, bridgeCubesCount, token);
+            leavesShortage = bridgeCubesCount - removed;
+        }
+
+        foreach (var cube in distinctBridgeCubes)
+        {
+            if (cube.IsEmpty) cube.IsEmpty = false;
+        }
+
+        using var gridAfter = line.GenerateGridFromLine();
+        var trees = Coherency.CreateCt(gridAfter, cancellationToken: token);
+        var colorMap = BuildColorMap(trees);
+        sw.Stop();
+
+        return new ConnectComponentsWorkResult
+        {
+            Trees = trees,
+            ColorMap = colorMap,
+            ElapsedMs = sw.ElapsedMilliseconds,
+            LeavesShortage = leavesShortage
+        };
     }
 
     private static int RemoveLeavesCascade(
         List<TreeNode<Cube>> components,
         HashSet<Cube> forbidden,
-        int target)
+        int target,
+        CancellationToken cancellationToken = default)
     {
         var leaves = new Queue<TreeNode<Cube>>();
         foreach (var root in components)
@@ -940,6 +992,7 @@ public partial class MainWindow : Window
         int removed = 0;
         while (removed < target && leaves.Count > 0)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var leaf = leaves.Dequeue();
             if (leaf.Children.Count > 0) continue;
             if (forbidden.Contains(leaf.Value)) continue;

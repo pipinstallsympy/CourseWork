@@ -1,3 +1,5 @@
+using System.Threading;
+
 namespace CourseWorkZherbin;
 
 public sealed record ConnectionPath(
@@ -10,7 +12,11 @@ public sealed record ConnectionPath(
 
 public class CoherencyConnector
 {
-    private ConnectionPath? ShortestConnection(CubeGrid grid, TreeNode<Cube> componentA, TreeNode<Cube> componentB)
+    private ConnectionPath? ShortestConnection(
+        CubeGrid grid,
+        TreeNode<Cube> componentA,
+        TreeNode<Cube> componentB,
+        CancellationToken cancellationToken)
     {
         var coordinates = BuildCoordIndex(grid);
         var aSet = CollectCubes(componentA);
@@ -36,6 +42,7 @@ public class CoherencyConnector
         Cube? hit = null;
         while (dequeued.Count > 0)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             Cube c = dequeued.First!.Value;
             dequeued.RemoveFirst();
 
@@ -88,8 +95,12 @@ public class CoherencyConnector
     }
 
 
-    public List<ConnectionPath> ConnectAll(CubeGrid grid, List<TreeNode<Cube>> components)
+    public List<ConnectionPath> ConnectAll(
+        CubeGrid grid,
+        List<TreeNode<Cube>> components,
+        CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         int k = components.Count;
         if (k < 2) return new List<ConnectionPath>();
         
@@ -97,9 +108,10 @@ public class CoherencyConnector
 
         for (int i = 0; i < k; i++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             for (int j = i + 1; j < k; j++)
             {
-                ConnectionPath? p  = ShortestConnection(grid, components[i], components[j]);
+                ConnectionPath? p = ShortestConnection(grid, components[i], components[j], cancellationToken);
                 if (p != null) edges.Add(p);
             }
         }
@@ -116,6 +128,7 @@ public class CoherencyConnector
         var mst = new List<ConnectionPath>();
         foreach (var e in edges)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             int a = indexOfComponent[e.From];
             int b = indexOfComponent[e.To];
             int ra = Find(a);
