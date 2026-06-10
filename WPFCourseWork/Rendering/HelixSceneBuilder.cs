@@ -5,6 +5,7 @@ using HelixToolkit.Wpf.SharpDX;
 using SharpDX;
 using WpfColor = System.Windows.Media.Color;
 using Color4 = SharpDX.Color4;
+using PerspectiveCamera = HelixToolkit.Wpf.SharpDX.PerspectiveCamera;
 
 namespace WPFCourseWork.Rendering;
 
@@ -224,6 +225,49 @@ public static class HelixSceneBuilder
     {
         mesh.Material = GetOrCreateMaterial(color, opacity);
         mesh.IsTransparent = opacity < 1.0;
+    }
+
+    public static (double minX, double minY, double minZ, double maxX, double maxY, double maxZ) ComputeSceneBounds(CubeLine line)
+    {
+        return ComputeBounds(line);
+    }
+
+    public static PerspectiveCamera CreateIsometricCamera(CubeLine line, double fieldOfView = 50)
+    {
+        return CreateIsometricCameraForBounds(ComputeBounds(line), fieldOfView);
+    }
+
+    public static PerspectiveCamera CreateIsometricCameraForBounds(
+        (double minX, double minY, double minZ, double maxX, double maxY, double maxZ) bounds,
+        double fieldOfView = 50)
+    {
+        var (minX, minY, minZ, maxX, maxY, maxZ) = bounds;
+        double cx = (minX + maxX) * 0.5;
+        double cy = (minY + maxY) * 0.5;
+        double cz = (minZ + maxZ) * 0.5;
+        var center = new Point3D(cx, cy, cz);
+
+        double dx = maxX - minX;
+        double dy = maxY - minY;
+        double dz = maxZ - minZ;
+        double radius = 0.5 * Math.Sqrt(dx * dx + dy * dy + dz * dz);
+
+        var direction = new Vector3D(1, 0.75, 1);
+        direction.Normalize();
+
+        double halfFovRad = fieldOfView * 0.5 * Math.PI / 180.0;
+        double distance = Math.Max(radius / Math.Sin(halfFovRad) * 1.3, 2.0);
+
+        var position = center + direction * distance;
+        var lookDirection = center - position;
+
+        return new PerspectiveCamera
+        {
+            Position = position,
+            LookDirection = lookDirection,
+            UpDirection = new Vector3D(0, 1, 0),
+            FieldOfView = fieldOfView
+        };
     }
 
     private static (double minX, double minY, double minZ, double maxX, double maxY, double maxZ) ComputeBounds(CubeLine line)

@@ -61,13 +61,13 @@ public partial class MainWindow : Window
         InitializeComponent();
         Viewport.EffectsManager = _effectsManager;
         ConfigureViewportChrome();
-        ConfigureTopDownCamera();
+        ConfigureDefaultCamera();
         _staticSceneItems = BuildStaticSceneItems();
         InitializeStaticScene();
         BringOriginAxesToFront();
         MethodsPanel.SelectionChanged += OnSelectionChanged;
         Viewport.PreviewMouseLeftButtonDown += OnViewport3DClick;
-        Viewport.Loaded += (_, _) => ConfigureTopDownCamera();
+        Viewport.Loaded += (_, _) => ConfigureDefaultCamera();
         UpdateExportColorVisibility();
         ExportModeHintText.Text = ExportWithColorCheckBox.IsChecked == true
             ? "Сохраняются только воксели материала с выбранным цветом (файл MTL создаётся рядом)."
@@ -84,18 +84,22 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Top-down view along -Y onto the X–Z grid and origin axes at (0, 0, 0).
+    /// Isometric view of the default unit-cube region before the first generation.
     /// </summary>
-    private void ConfigureTopDownCamera()
+    private void ConfigureDefaultCamera()
     {
-        const double distance = 3.5;
-        Viewport.Camera = new PerspectiveCamera
+        Viewport.Camera = HelixSceneBuilder.CreateIsometricCameraForBounds((0, 0, 0, 1, 1, 1));
+    }
+
+    private void FrameCameraToLine(CubeLine? line)
+    {
+        if (line == null || line.Count() == 0)
         {
-            Position = new System.Windows.Media.Media3D.Point3D(0, distance, 0),
-            LookDirection = new System.Windows.Media.Media3D.Vector3D(0, -distance, 0),
-            UpDirection = new System.Windows.Media.Media3D.Vector3D(0, 0, -1),
-            FieldOfView = 50
-        };
+            ConfigureDefaultCamera();
+            return;
+        }
+
+        Viewport.Camera = HelixSceneBuilder.CreateIsometricCamera(line);
     }
 
     private IReadOnlyList<Element3D> BuildStaticSceneItems()
@@ -394,6 +398,7 @@ public partial class MainWindow : Window
         _selectedPercolationTreeIndex = -1;
         StatsPercolationCount.Text = "Деревьев перколяции: -";
         SetPercolationTabAvailable(false);
+        FrameCameraToLine(liney);
     }
 
     private static int GetPartitionFromLine(CubeLine line) =>
