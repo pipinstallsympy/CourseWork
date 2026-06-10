@@ -1,83 +1,1 @@
-using System.Globalization;
-
-namespace CourseWorkZherbin;
-
-public readonly record struct ObjColor(byte R, byte G, byte B)
-{
-    public static ObjColor DefaultMaterial => new(0xCC, 0x22, 0x22);
-
-    public static ObjColor DefaultPore => new(0x8F, 0xBC, 0x8F);
-
-    public string ToMtlKa()
-    {
-        return FormatMtlComponentLine("Ka", R, G, B);
-    }
-
-    public string ToMtlKd()
-    {
-        return FormatMtlComponentLine("Kd", R, G, B);
-    }
-
-    private static string FormatMtlComponentLine(string prefix, byte r, byte g, byte b)
-    {
-        var culture = CultureInfo.InvariantCulture;
-        return string.Format(
-            culture,
-            "{0} {1:0.###} {2:0.###} {3:0.###}",
-            prefix,
-            r / 255.0,
-            g / 255.0,
-            b / 255.0);
-    }
-
-    public string ToHex()
-    {
-        return $"#{R:X2}{G:X2}{B:X2}";
-    }
-
-    public static bool TryParseHex(string? hex, out ObjColor color)
-    {
-        color = default;
-        if (string.IsNullOrWhiteSpace(hex))
-        {
-            return false;
-        }
-
-        string value = hex.Trim();
-        if (value.StartsWith('#'))
-        {
-            value = value[1..];
-        }
-
-        if (value.Length != 6)
-        {
-            return false;
-        }
-
-        if (!byte.TryParse(value[..2], NumberStyles.HexNumber, CultureInfo.InvariantCulture, out byte r) ||
-            !byte.TryParse(value[2..4], NumberStyles.HexNumber, CultureInfo.InvariantCulture, out byte g) ||
-            !byte.TryParse(value[4..6], NumberStyles.HexNumber, CultureInfo.InvariantCulture, out byte b))
-        {
-            return false;
-        }
-
-        color = new ObjColor(r, g, b);
-        return true;
-    }
-}
-
-public record ObjExportSettings(
-    ObjExportMode Mode,
-    ObjColor MaterialColor,
-    ObjColor PoreColor,
-    bool IncludeMaterialColor,
-    bool IncludePoreColor)
-{
-    public bool WritesMtlFile => Mode switch
-    {
-        ObjExportMode.Combined => true,
-        ObjExportMode.MaterialOnly => IncludeMaterialColor,
-        ObjExportMode.PoresOnly => IncludePoreColor,
-        _ => false
-    };
-}
+using System.Globalization;namespace CourseWorkZherbin;public readonly record struct ObjColor(byte R, byte G, byte B){    public static ObjColor DefaultMaterial => new(0xCC, 0x22, 0x22);    public static ObjColor DefaultPore => new(0x8F, 0xBC, 0x8F);    public string ToMtlKd()    {        return FormatMtlComponentLine("Kd", R, G, B);    }    private static string FormatMtlComponentLine(string prefix, byte r, byte g, byte b)    {        var culture = CultureInfo.InvariantCulture;        return string.Format(            culture,            "{0} {1:0.###} {2:0.###} {3:0.###}",            prefix,            SrgbToLinear(r / 255.0),            SrgbToLinear(g / 255.0),            SrgbToLinear(b / 255.0));    }    private static double SrgbToLinear(double srgb)    {        if (srgb <= 0.04045)        {            return srgb / 12.92;        }        return Math.Pow((srgb + 0.055) / 1.055, 2.4);    }    public string ToHex()    {        return $"#{R:X2}{G:X2}{B:X2}";    }    public static bool TryParseHex(string? hex, out ObjColor color)    {        color = default;        if (string.IsNullOrWhiteSpace(hex))        {            return false;        }        string value = hex.Trim();        if (value.StartsWith('#'))        {            value = value[1..];        }        if (value.Length != 6)        {            return false;        }        if (!byte.TryParse(value[..2], NumberStyles.HexNumber, CultureInfo.InvariantCulture, out byte r) ||            !byte.TryParse(value[2..4], NumberStyles.HexNumber, CultureInfo.InvariantCulture, out byte g) ||            !byte.TryParse(value[4..6], NumberStyles.HexNumber, CultureInfo.InvariantCulture, out byte b))        {            return false;        }        color = new ObjColor(r, g, b);        return true;    }}public record ObjExportSettings(    ObjExportMode Mode,    ObjColor MaterialColor,    ObjColor PoreColor,    bool IncludeMaterialColor,    bool IncludePoreColor){    public bool WritesMtlFile => Mode switch    {        ObjExportMode.Combined => true,        ObjExportMode.MaterialOnly => IncludeMaterialColor,        ObjExportMode.PoresOnly => IncludePoreColor,        _ => false    };}

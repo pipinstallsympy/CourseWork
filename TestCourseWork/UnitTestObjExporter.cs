@@ -342,10 +342,11 @@ public class UnitTestObjExporter
             string mtlContent = File.ReadAllText(mtlPath);
             Assert.Contains("newmtl solid_CC2222", mtlContent);
             Assert.Contains("newmtl pore_8FBC8F", mtlContent);
-            Assert.Contains("Kd 0.8 0.133 0.133", mtlContent);
-            Assert.Contains("Kd 0.561 0.737 0.561", mtlContent);
+            Assert.Contains("Ka 0 0 0", mtlContent);
+            Assert.Contains(ObjColor.DefaultMaterial.ToMtlKd(), mtlContent);
+            Assert.Contains(ObjColor.DefaultPore.ToMtlKd(), mtlContent);
             Assert.Contains("d 1.0", mtlContent);
-            Assert.Contains("illum 2", mtlContent);
+            Assert.Contains("illum 1", mtlContent);
         }
         finally
         {
@@ -396,10 +397,18 @@ public class UnitTestObjExporter
     }
 
     [Fact]
-    public void ObjColor_ToMtlKd_WritesNormalizedComponents()
+    public void ObjColor_ToMtlKd_WritesLinearComponents()
     {
-        Assert.Equal("Kd 0.8 0.133 0.133", ObjColor.DefaultMaterial.ToMtlKd());
-        Assert.Equal("Ka 0.8 0.133 0.133", ObjColor.DefaultMaterial.ToMtlKa());
+        Assert.Equal("Kd 0.604 0.016 0.016", ObjColor.DefaultMaterial.ToMtlKd());
+        Assert.Equal("Kd 0.275 0.503 0.275", ObjColor.DefaultPore.ToMtlKd());
+    }
+
+    [Theory]
+    [InlineData(0xFF, 0xFF, 0xFF, "Kd 1 1 1")]
+    [InlineData(0x00, 0x00, 0x00, "Kd 0 0 0")]
+    public void ObjColor_ToMtlKd_ConvertsSrgbExtremes(byte r, byte g, byte b, string expected)
+    {
+        Assert.Equal(expected, new ObjColor(r, g, b).ToMtlKd());
     }
 
     [Fact]
@@ -419,7 +428,7 @@ public class UnitTestObjExporter
             string objContent = File.ReadAllText(objPath);
             Assert.Contains("mtllib", objContent);
             Assert.Contains("usemtl solid_112233", objContent);
-            Assert.Contains("illum 2", File.ReadAllText(mtlPath));
+            Assert.Contains("illum 1", File.ReadAllText(mtlPath));
             Assert.True(File.Exists(mtlPath));
             Assert.Contains(customColor.ToMtlKd(), File.ReadAllText(mtlPath));
         }
@@ -470,7 +479,7 @@ public class UnitTestObjExporter
             string objContent = File.ReadAllText(objPath);
             Assert.Contains("mtllib", objContent);
             Assert.Contains("usemtl pore_445566", objContent);
-            Assert.Contains("illum 2", File.ReadAllText(mtlPath));
+            Assert.Contains("illum 1", File.ReadAllText(mtlPath));
             Assert.True(File.Exists(mtlPath));
             Assert.Contains(customColor.ToMtlKd(), File.ReadAllText(mtlPath));
         }
@@ -500,8 +509,8 @@ public class UnitTestObjExporter
 
             Assert.Contains("newmtl solid_FF0000", mtlContent);
             Assert.Contains("newmtl pore_8FBC8F", mtlContent);
-            Assert.Contains("Kd 1 0 0", mtlContent);
-            Assert.Contains("Kd 0.561 0.737 0.561", mtlContent);
+            Assert.Contains(materialColor.ToMtlKd(), mtlContent);
+            Assert.Contains(poreColor.ToMtlKd(), mtlContent);
         }
         finally
         {

@@ -412,12 +412,12 @@ public static class ObjExporter
 
     private static void WriteMtlColorProperties(TextWriter writer, ObjColor color)
     {
-        writer.WriteLine(color.ToMtlKa());
+        writer.WriteLine("Ka 0 0 0");
         writer.WriteLine(color.ToMtlKd());
         writer.WriteLine("Ks 0 0 0");
         writer.WriteLine("Ns 0");
         writer.WriteLine("d 1.0");
-        writer.WriteLine("illum 2");
+        writer.WriteLine("illum 1");
     }
 
     private static bool ShouldExportMaterialFace(
