@@ -51,11 +51,19 @@ public partial class MainWindow : Window
         _percolationTabAvailable
         && MainSideTabControl.SelectedItem == PercolationTabItem;
 
+    private enum CalculationJobType
+    {
+        CoherencyCheck,
+        Percolation,
+        ConnectComponents
+    }
+
     private const int CoherencyPartitionWarningThreshold = 48;
-    private bool _coherencyCalculationInProgress;
-    private CancellationTokenSource? _coherencyCts;
-    private bool _percolationCalculationInProgress;
-    private CancellationTokenSource? _percolationCts;
+    private CancellationTokenSource? _pipelineCts;
+    private readonly Queue<CalculationJobType> _jobQueue = new();
+    private CalculationJobType? _runningJob;
+    private bool _pipelineProcessing;
+    private bool _connectPreserveMaterial;
     private int _objectGeneration;
     private ExportColorTarget _activeExportColorTarget = ExportColorTarget.Material;
 
@@ -413,8 +421,7 @@ public partial class MainWindow : Window
     private void StoreGeneratedLine(CubeLine? liney)
     {
         _objectGeneration++;
-        CancelCoherencyWork();
-        CancelPercolationWork();
+        CancelPipeline();
         _currentLine = liney;
         coherenceTreeList = new List<TreeNode<Cube>>();
         _cubeColorMap = null;
@@ -430,140 +437,273 @@ public partial class MainWindow : Window
         StatsPercolationCount.Text = "Деревьев перколяции: -";
         SetPercolationTabAvailable(false);
         FrameCameraToLine(liney);
+
+        if (liney != null)
+            StartPipelineWithCoherencyCheck();
     }
 
     private static int GetPartitionFromLine(CubeLine line) =>
         (int)Math.Round(Math.Cbrt(line.Count()));
 
-    private bool ConfirmLargePartitionOperation(int partition, bool connectComponents)
+    private bool ConfirmLargePartitionConnectOperation(int partition)
     {
         if (partition < CoherencyPartitionWarningThreshold) return true;
-        string message = connectComponents
-            ? $"При разбиении {partition} объединение матрицы материала может занять несколько минут. Продолжить?"
-            : $"При разбиении {partition} расчёт связности может занять несколько минут. Продолжить?";
-        string title = connectComponents ? "Соединение компонентов" : "Проверка связности";
         var result = MessageBox.Show(
-            message,
-            title,
+            $"При разбиении {partition} объединение матрицы материала может занять несколько минут. Продолжить?",
+            "Соединение компонентов",
             MessageBoxButton.YesNo,
             MessageBoxImage.Warning);
         return result == MessageBoxResult.Yes;
     }
 
-    private void SetCoherencyBusy(bool busy)
+    private void CancelPipeline()
     {
-        _coherencyCalculationInProgress = busy;
-        CheckCoherencyButton.IsEnabled = !busy;
-        ConnectComponentsButton.IsEnabled = !busy;
-        if (busy)
+        if (_pipelineCts != null)
+        {
+            _pipelineCts.Cancel();
+            _pipelineCts.Dispose();
+            _pipelineCts = null;
+        }
+
+        _jobQueue.Clear();
+        _runningJob = null;
+        _pipelineProcessing = false;
+        SetConnectBusy(false);
+        SetPercolationBusy(false);
+    }
+
+    private void EnsurePipelineStarted()
+    {
+        if (_pipelineCts == null || _pipelineCts.IsCancellationRequested)
+        {
+            _pipelineCts?.Dispose();
+            _pipelineCts = new CancellationTokenSource();
+        }
+    }
+
+    private void StartPipelineWithCoherencyCheck()
+    {
+        EnsurePipelineStarted();
+        _jobQueue.Enqueue(CalculationJobType.CoherencyCheck);
+        ProcessPipelineAsync();
+    }
+
+    private void EnqueueJob(CalculationJobType job)
+    {
+        if (_runningJob == job || _jobQueue.Contains(job)) return;
+
+        EnsurePipelineStarted();
+        _jobQueue.Enqueue(job);
+        ProcessPipelineAsync();
+    }
+
+    private void SetCoherencyCheckInProgress(bool inProgress)
+    {
+        if (inProgress)
             StatsCoherencyCount.Text = "Связных компонент: идёт расчёт…";
     }
 
-    private void CancelCoherencyWork()
+    private void SetConnectBusy(bool busy)
     {
-        if (_coherencyCts == null) return;
-        _coherencyCts.Cancel();
-        _coherencyCts.Dispose();
-        _coherencyCts = null;
-        SetCoherencyBusy(false);
-    }
-
-    private CancellationTokenSource BeginCoherencyWork()
-    {
-        CancelCoherencyWork();
-        _coherencyCts = new CancellationTokenSource();
-        SetCoherencyBusy(true);
-        return _coherencyCts;
-    }
-
-    private void EndCoherencyWork(CancellationTokenSource cts)
-    {
-        if (!ReferenceEquals(_coherencyCts, cts)) return;
-        _coherencyCts.Dispose();
-        _coherencyCts = null;
-        SetCoherencyBusy(false);
+        ConnectComponentsButton.IsEnabled = !busy;
+        if (busy)
+            StatsCoherencyCount.Text = "Связных компонент: идёт соединение…";
     }
 
     private void SetPercolationBusy(bool busy)
     {
-        _percolationCalculationInProgress = busy;
         CheckPercolationButton.IsEnabled = !busy;
         if (busy)
             StatsPercolationCount.Text = "Деревьев перколяции: идёт расчёт…";
     }
 
-    private void CancelPercolationWork()
+    private async void ProcessPipelineAsync()
     {
-        if (_percolationCts == null) return;
-        _percolationCts.Cancel();
-        _percolationCts.Dispose();
-        _percolationCts = null;
-        SetPercolationBusy(false);
-    }
+        if (_pipelineProcessing) return;
 
-    private CancellationTokenSource BeginPercolationWork()
-    {
-        CancelPercolationWork();
-        _percolationCts = new CancellationTokenSource();
-        SetPercolationBusy(true);
-        return _percolationCts;
-    }
-
-    private void EndPercolationWork(CancellationTokenSource cts)
-    {
-        if (!ReferenceEquals(_percolationCts, cts)) return;
-        _percolationCts.Dispose();
-        _percolationCts = null;
-        SetPercolationBusy(false);
-    }
-
-    private async void OnCheckCoherency(object sender, RoutedEventArgs e)
-    {
-        if (_currentLine == null)
-        {
-            MessageBox.Show("Сначала сгенерируйте объект");
-            return;
-        }
-
-        if (_coherencyCalculationInProgress) return;
-
-        int partition = GetPartitionFromLine(_currentLine);
-        if (!ConfirmLargePartitionOperation(partition, connectComponents: false)) return;
-
-        var line = _currentLine;
-        var cts = BeginCoherencyWork();
-        var token = cts.Token;
+        _pipelineProcessing = true;
         var generation = _objectGeneration;
+
         try
         {
-            var (trees, colorMap, elapsedMs) = await Task.Run(() =>
+            while (_jobQueue.Count > 0
+                   && _pipelineCts?.IsCancellationRequested != true
+                   && generation == _objectGeneration)
             {
-                using var grid = line.GenerateGridFromLine();
-                var sw = Stopwatch.StartNew();
-                var resultTrees = Coherency.CreateCt(grid, cancellationToken: token);
-                var map = BuildColorMap(resultTrees);
-                sw.Stop();
-                return (resultTrees, map, sw.ElapsedMilliseconds);
-            }, token);
+                var job = _jobQueue.Dequeue();
+                _runningJob = job;
 
-            if (generation != _objectGeneration) return;
-
-            coherenceTreeList = trees;
-            _cubeColorMap = colorMap;
-            StatsLastCalcTime.Text = $"Время последнего расчёта: {elapsedMs} мс";
-            StatsCoherencyCount.Text = $"Связных компонент: {coherenceTreeList.Count}";
-            RedrawCubes();
-        }
-        catch (OperationCanceledException)
-        {
-        }
-        catch (Exception ex) when (generation == _objectGeneration)
-        {
-            MessageBox.Show(ex.Message);
+                try
+                {
+                    await RunPipelineJobAsync(job, generation);
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+                finally
+                {
+                    _runningJob = null;
+                }
+            }
         }
         finally
         {
-            EndCoherencyWork(cts);
+            _pipelineProcessing = false;
+
+            if (_jobQueue.Count > 0
+                && generation == _objectGeneration
+                && _pipelineCts?.IsCancellationRequested != true)
+            {
+                ProcessPipelineAsync();
+            }
+        }
+    }
+
+    private static (List<TreeNode<Cube>> Trees, Dictionary<Cube, Color> ColorMap, long ElapsedMs) RunCoherencyCheckWork(
+        CubeLine line,
+        CancellationToken token)
+    {
+        using var grid = line.GenerateGridFromLine();
+        var sw = Stopwatch.StartNew();
+        var trees = Coherency.CreateCt(grid, cancellationToken: token);
+        var map = BuildColorMap(trees);
+        sw.Stop();
+        return (trees, map, sw.ElapsedMilliseconds);
+    }
+
+    private async Task RunPipelineJobAsync(CalculationJobType job, int generation)
+    {
+        if (_currentLine == null || _pipelineCts == null) return;
+
+        var token = _pipelineCts.Token;
+        var line = _currentLine;
+
+        switch (job)
+        {
+            case CalculationJobType.CoherencyCheck:
+                SetCoherencyCheckInProgress(true);
+                try
+                {
+                    var (trees, colorMap, elapsedMs) = await Task.Run(
+                        () => RunCoherencyCheckWork(line, token),
+                        token);
+
+                    if (generation != _objectGeneration) return;
+
+                    coherenceTreeList = trees;
+                    _cubeColorMap = colorMap;
+                    StatsLastCalcTime.Text = $"Время последнего расчёта: {elapsedMs} мс";
+                    StatsCoherencyCount.Text = $"Связных компонент: {coherenceTreeList.Count}";
+                    RedrawCubes();
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException && generation == _objectGeneration)
+                {
+                    MessageBox.Show(ex.Message);
+                }
+                finally
+                {
+                    SetCoherencyCheckInProgress(false);
+                }
+
+                break;
+
+            case CalculationJobType.Percolation:
+                SetPercolationBusy(true);
+                try
+                {
+                    var (list, elapsedMs) = await Task.Run(
+                        () => RunPercolationWork(line, token),
+                        token);
+
+                    if (generation != _objectGeneration) return;
+
+                    _permeabilityTreeList = list;
+                    ApplyPercolationResults();
+                    StatsLastCalcTime.Text = $"Время последнего расчёта: {elapsedMs} мс";
+                    if (IsPercolationViewActive) RedrawCubes();
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException && generation == _objectGeneration)
+                {
+                    MessageBox.Show(ex.Message);
+                }
+                finally
+                {
+                    if (generation == _objectGeneration)
+                        SetPercolationBusy(false);
+                }
+
+                break;
+
+            case CalculationJobType.ConnectComponents:
+                SetConnectBusy(true);
+                try
+                {
+                    var workResult = await Task.Run(
+                        () => RunConnectComponentsWork(line, _connectPreserveMaterial, token),
+                        token);
+
+                    if (generation != _objectGeneration) return;
+
+                    if (workResult.AlreadyConnected)
+                    {
+                        MessageBox.Show("Все узлы материала уже связаны.");
+                        StatsLastCalcTime.Text = $"Время последнего расчёта: {workResult.ElapsedMs} мс";
+                        StatsCoherencyCount.Text = coherenceTreeList.Count > 0
+                            ? $"Связных компонент: {coherenceTreeList.Count}"
+                            : "Связных компонент: -";
+                        return;
+                    }
+
+                    coherenceTreeList = workResult.Trees;
+                    _cubeColorMap = workResult.ColorMap;
+                    UpdateNodeStats(line);
+                    StatsCoherencyCount.Text = $"Связных компонент: {coherenceTreeList.Count}";
+                    StatsLastCalcTime.Text = $"Время последнего расчёта: {workResult.ElapsedMs} мс";
+                    RedrawCubes();
+
+                    if (workResult.LeavesShortage > 0)
+                    {
+                        MessageBox.Show(
+                            $"Не хватило листовых узлов материала для полного сохранения количества: " +
+                            $"{workResult.LeavesShortage} соединяющих узлов добавлены без компенсации.");
+                    }
+
+                    if (_permeabilityTreeList != null)
+                    {
+                        SetPercolationBusy(true);
+                        try
+                        {
+                            var (list, percolationMs) = await Task.Run(
+                                () => RunPercolationWork(line, token),
+                                token);
+
+                            if (generation != _objectGeneration) return;
+
+                            _permeabilityTreeList = list;
+                            ApplyPercolationResults();
+                            StatsLastCalcTime.Text =
+                                $"Время последнего расчёта: {workResult.ElapsedMs} мс (связность), {percolationMs} мс (перколяция)";
+                            if (IsPercolationViewActive) RedrawCubes();
+                        }
+                        finally
+                        {
+                            if (generation == _objectGeneration)
+                                SetPercolationBusy(false);
+                        }
+                    }
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException && generation == _objectGeneration)
+                {
+                    MessageBox.Show(ex.Message);
+                }
+                finally
+                {
+                    if (generation == _objectGeneration)
+                        SetConnectBusy(false);
+                }
+
+                break;
         }
     }
 
@@ -596,15 +736,7 @@ public partial class MainWindow : Window
         SetPercolationTabAvailable(_permeabilityTreeList.TreeList.Count > 0);
     }
 
-    private long RecalculatePercolation()
-    {
-        var (list, elapsedMs) = RunPercolationWork(_currentLine!, CancellationToken.None);
-        _permeabilityTreeList = list;
-        ApplyPercolationResults();
-        return elapsedMs;
-    }
-
-    private async void OnCheckPercolation(object sender, RoutedEventArgs e)
+    private void OnCheckPercolation(object sender, RoutedEventArgs e)
     {
         if (_currentLine == null)
         {
@@ -612,35 +744,9 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (_percolationCalculationInProgress) return;
+        if (_runningJob == CalculationJobType.Percolation) return;
 
-        var line = _currentLine;
-        var cts = BeginPercolationWork();
-        var token = cts.Token;
-        var generation = _objectGeneration;
-        try
-        {
-            var (list, elapsedMs) = await Task.Run(
-                () => RunPercolationWork(line, token),
-                token);
-
-            if (generation != _objectGeneration) return;
-
-            _permeabilityTreeList = list;
-            ApplyPercolationResults();
-            StatsLastCalcTime.Text = $"Время последнего расчёта: {elapsedMs} мс";
-        }
-        catch (OperationCanceledException)
-        {
-        }
-        catch (Exception ex) when (generation == _objectGeneration)
-        {
-            MessageBox.Show(ex.Message);
-        }
-        finally
-        {
-            EndPercolationWork(cts);
-        }
+        EnqueueJob(CalculationJobType.Percolation);
     }
 
     private void OnExportModeChanged(object sender, RoutedEventArgs e)
@@ -1248,7 +1354,7 @@ public partial class MainWindow : Window
         public int LeavesShortage { get; init; }
     }
 
-    private async void OnConnectComponents(object sender, RoutedEventArgs e)
+    private void OnConnectComponents(object sender, RoutedEventArgs e)
     {
         if (_currentLine == null)
         {
@@ -1256,67 +1362,13 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (_coherencyCalculationInProgress) return;
+        if (_runningJob == CalculationJobType.ConnectComponents) return;
 
         int partition = GetPartitionFromLine(_currentLine);
-        if (!ConfirmLargePartitionOperation(partition, connectComponents: true)) return;
+        if (!ConfirmLargePartitionConnectOperation(partition)) return;
 
-        var line = _currentLine;
-        bool preserveMaterial = PreserveMaterialCheckBox?.IsChecked == true;
-        bool hadPercolation = _permeabilityTreeList != null;
-        var cts = BeginCoherencyWork();
-        var token = cts.Token;
-        var generation = _objectGeneration;
-        try
-        {
-            var workResult = await Task.Run(
-                () => RunConnectComponentsWork(line, preserveMaterial, token),
-                token);
-
-            if (generation != _objectGeneration) return;
-
-            if (workResult.AlreadyConnected)
-            {
-                MessageBox.Show("Все узлы материала уже связаны.");
-                StatsLastCalcTime.Text = $"Время последнего расчёта: {workResult.ElapsedMs} мс";
-                StatsCoherencyCount.Text = coherenceTreeList.Count > 0
-                    ? $"Связных компонент: {coherenceTreeList.Count}"
-                    : "Связных компонент: -";
-                return;
-            }
-
-            coherenceTreeList = workResult.Trees;
-            _cubeColorMap = workResult.ColorMap;
-            UpdateNodeStats(line);
-            StatsCoherencyCount.Text = $"Связных компонент: {coherenceTreeList.Count}";
-            StatsLastCalcTime.Text = $"Время последнего расчёта: {workResult.ElapsedMs} мс";
-            RedrawCubes();
-
-            if (hadPercolation)
-            {
-                long percolationMs = RecalculatePercolation();
-                StatsLastCalcTime.Text =
-                    $"Время последнего расчёта: {workResult.ElapsedMs} мс (связность), {percolationMs} мс (перколяция)";
-            }
-
-            if (workResult.LeavesShortage > 0)
-            {
-                MessageBox.Show(
-                    $"Не хватило листовых узлов материала для полного сохранения количества: " +
-                    $"{workResult.LeavesShortage} соединяющих узлов добавлены без компенсации.");
-            }
-        }
-        catch (OperationCanceledException)
-        {
-        }
-        catch (Exception ex) when (generation == _objectGeneration)
-        {
-            MessageBox.Show(ex.Message);
-        }
-        finally
-        {
-            EndCoherencyWork(cts);
-        }
+        _connectPreserveMaterial = PreserveMaterialCheckBox?.IsChecked == true;
+        EnqueueJob(CalculationJobType.ConnectComponents);
     }
 
     private static ConnectComponentsWorkResult RunConnectComponentsWork(
