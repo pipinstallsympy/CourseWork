@@ -167,9 +167,52 @@ public static class HelixSceneBuilder
 
         return new LineGeometryModel3D
         {
-            Geometry = new LineGeometry3D { Positions = positions },
+            Geometry = CreateLineGeometry(positions),
             Color = WpfColor.FromRgb(0x69, 0x69, 0x69),
             Thickness = 1.0,
+            IsHitTestVisible = false
+        };
+    }
+
+    public static LineGeometryModel3D? BuildSampleBoundaryWireframe(CubeLine line, double thickness = 1.0)
+    {
+        return BuildSampleBoundaryWireframe(ComputeSceneBounds(line), thickness);
+    }
+
+    public static LineGeometryModel3D? BuildSampleBoundaryWireframe(
+        (double minX, double minY, double minZ, double maxX, double maxY, double maxZ) bounds,
+        double thickness = 3.0)
+    {
+        var (minX, minY, minZ, maxX, maxY, maxZ) = bounds;
+        var positions = new Vector3Collection(24);
+
+        void AddEdge(double x1, double y1, double z1, double x2, double y2, double z2)
+        {
+            positions.Add(new Vector3((float)x1, (float)y1, (float)z1));
+            positions.Add(new Vector3((float)x2, (float)y2, (float)z2));
+        }
+
+        // Bottom face (Y = minY)
+        AddEdge(minX, minY, minZ, maxX, minY, minZ);
+        AddEdge(maxX, minY, minZ, maxX, minY, maxZ);
+        AddEdge(maxX, minY, maxZ, minX, minY, maxZ);
+        AddEdge(minX, minY, maxZ, minX, minY, minZ);
+        // Top face (Y = maxY)
+        AddEdge(minX, maxY, minZ, maxX, maxY, minZ);
+        AddEdge(maxX, maxY, minZ, maxX, maxY, maxZ);
+        AddEdge(maxX, maxY, maxZ, minX, maxY, maxZ);
+        AddEdge(minX, maxY, maxZ, minX, maxY, minZ);
+        // Vertical edges
+        AddEdge(minX, minY, minZ, minX, maxY, minZ);
+        AddEdge(maxX, minY, minZ, maxX, maxY, minZ);
+        AddEdge(maxX, minY, maxZ, maxX, maxY, maxZ);
+        AddEdge(minX, minY, maxZ, minX, maxY, maxZ);
+
+        return new LineGeometryModel3D
+        {
+            Geometry = CreateLineGeometry(positions),
+            Color = WpfColor.FromRgb(0x69, 0x69, 0x69),
+            Thickness = thickness,
             IsHitTestVisible = false
         };
     }
@@ -197,7 +240,7 @@ public static class HelixSceneBuilder
 
         return new LineGeometryModel3D
         {
-            Geometry = new LineGeometry3D { Positions = positions },
+            Geometry = CreateLineGeometry(positions),
             Color = color,
             Thickness = thickness,
             IsHitTestVisible = false
@@ -302,6 +345,19 @@ public static class HelixSceneBuilder
         {
             Direction = direction,
             Color = color
+        };
+    }
+
+    private static LineGeometry3D CreateLineGeometry(Vector3Collection positions)
+    {
+        var indices = new IntCollection(positions.Count);
+        for (int i = 0; i < positions.Count; i++)
+            indices.Add(i);
+
+        return new LineGeometry3D
+        {
+            Positions = positions,
+            Indices = indices
         };
     }
 

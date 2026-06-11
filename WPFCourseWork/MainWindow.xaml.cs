@@ -43,6 +43,7 @@ public partial class MainWindow : Window
     private bool _percolationTabAvailable;
     private Dictionary<Cube, MeshGeometryModel3D>? _poreMeshByCube;
     private LineGeometryModel3D? _percolationWireframe;
+    private LineGeometryModel3D? _sampleBoundaryWireframe;
     private readonly List<Element3D> _percolationConnectionLines = new();
     private int _percolationSelectionUpdateVersion;
 
@@ -1106,6 +1107,13 @@ public partial class MainWindow : Window
             _percolationWireframe = null;
         }
 
+        if (_sampleBoundaryWireframe != null)
+        {
+            Viewport.Items.Remove(_sampleBoundaryWireframe);
+            _dynamicSceneItems.Remove(_sampleBoundaryWireframe);
+            _sampleBoundaryWireframe = null;
+        }
+
         if (_poreMeshByCube != null)
         {
             foreach (var mesh in _poreMeshByCube.Values)
@@ -1129,27 +1137,11 @@ public partial class MainWindow : Window
 
         ClearPercolationScene();
 
-        int len = _currentLine.Count();
-        int side = (int)Math.Round(Math.Cbrt(len));
-        var uniqueEdges = new HashSet<(int, int, int, int, int, int)>();
+        _sampleBoundaryWireframe = HelixSceneBuilder.BuildSampleBoundaryWireframe(_currentLine);
+        if (_sampleBoundaryWireframe != null)
+            AddDynamicSceneItem(_sampleBoundaryWireframe);
 
-        for (int idx = 0; idx < len; idx++)
-        {
-            var current = _currentLine[idx];
-            if (current.IsEmpty) continue;
-
-            int i = idx / (side * side);
-            int j = (idx / side) % side;
-            int k = idx % side;
-            CollectOuterFaceEdges(uniqueEdges, i, j, k, side);
-        }
-
-        if (uniqueEdges.Count > 0)
-        {
-            _percolationWireframe = HelixSceneBuilder.BuildMaterialWireframe(uniqueEdges, _currentLine[0]);
-            if (_percolationWireframe != null)
-                AddDynamicSceneItem(_percolationWireframe);
-        }
+      
 
         _poreMeshByCube = new Dictionary<Cube, MeshGeometryModel3D>();
         foreach (var cube in visiblePores)
