@@ -43,6 +43,7 @@ public class Coherency
             }
         }
 
+        Console.WriteLine($"Created {(isMaterial ? "material" : "pore")} coherency forest. count: {nodes.Count}");
         return nodes;
     }
 

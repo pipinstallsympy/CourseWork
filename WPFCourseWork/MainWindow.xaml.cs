@@ -62,6 +62,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        Console.SetOut(new ConsoleLogWriter(AppendLogLine));
         Viewport.EffectsManager = _effectsManager;
         ConfigureViewportChrome();
         ConfigureDefaultCamera();
@@ -148,6 +149,29 @@ public partial class MainWindow : Window
         _dynamicSceneItems.Add(item);
     }
 
+    private void AppendLogLine(string text)
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.BeginInvoke(() => AppendLogLine(text));
+            return;
+        }
+
+        LogsTextBox.AppendText(text);
+        LogsTextBox.ScrollToEnd();
+    }
+
+    private void ClearLogs()
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.BeginInvoke(ClearLogs);
+            return;
+        }
+
+        LogsTextBox.Clear();
+    }
+
     private void OnSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         switch (MethodsPanel.SelectedIndex)
@@ -183,6 +207,8 @@ public partial class MainWindow : Window
             MessageBox.Show("Значение пор задано неверно");
             return;
         }
+
+        ClearLogs();
 
         switch (MethodsPanel.SelectedIndex)
         {

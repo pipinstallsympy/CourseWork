@@ -115,6 +115,7 @@ public class CubeLine : IDisposable
         }
         finally
         {
+            Console.WriteLine($"Generated Pores: {k}");
             ArrayPool<int>.Shared.Return(indices);
         }
     }

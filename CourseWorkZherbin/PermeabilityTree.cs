@@ -36,6 +36,8 @@ public class PermeabilityTreeList
                 TreeList.Add(tree);
 
         }
+
+        Console.WriteLine($"Created permeability forest. count: {TreeList.Count}");
     }
 }
 

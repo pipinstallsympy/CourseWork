@@ -345,6 +345,18 @@
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
+
+            <TabItem x:Name="LogsTabItem" Header="Логи">
+                <TextBox x:Name="LogsTextBox"
+                         IsReadOnly="True"
+                         TextWrapping="Wrap"
+                         VerticalScrollBarVisibility="Auto"
+                         HorizontalScrollBarVisibility="Disabled"
+                         FontFamily="Consolas"
+                         FontSize="11"
+                         Background="#FAFAFA"
+                         BorderThickness="0"/>
+            </TabItem>
         </TabControl>
 
         <UniformGrid Grid.Column="1"

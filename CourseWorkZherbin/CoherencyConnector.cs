@@ -142,6 +142,7 @@ public class CoherencyConnector
             }
         }
 
+        Console.WriteLine("Connected components");
         return mst;
     }
 
