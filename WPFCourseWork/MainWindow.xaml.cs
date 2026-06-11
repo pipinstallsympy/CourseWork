@@ -53,6 +53,8 @@ public partial class MainWindow : Window
     private const int CoherencyPartitionWarningThreshold = 48;
     private bool _coherencyCalculationInProgress;
     private CancellationTokenSource? _coherencyCts;
+    private bool _percolationCalculationInProgress;
+    private CancellationTokenSource? _percolationCts;
     private int _objectGeneration;
     private ExportColorTarget _activeExportColorTarget = ExportColorTarget.Material;
 
@@ -327,14 +329,15 @@ public partial class MainWindow : Window
 
     private bool CreateFlag(int partition, string? poreChoice, double poresValue)
     {
+        int cellCount = partition * partition * partition;
         switch (poreChoice)
         {
             case "По количеству":
-                int threshold = partition * partition * partition / 2;
-                return poresValue > threshold;
-                
+                return poresValue > cellCount / 2;
+
             case "По процентному соотношению":
-                return poresValue > 50;
+                int targetPores = (int)Math.Ceiling(poresValue / 100.0 * cellCount);
+                return targetPores > cellCount / 2;
         }
 
         return false;
@@ -384,6 +387,7 @@ public partial class MainWindow : Window
     {
         _objectGeneration++;
         CancelCoherencyWork();
+        CancelPercolationWork();
         _currentLine = liney;
         coherenceTreeList = new List<TreeNode<Cube>>();
         _cubeColorMap = null;
@@ -453,6 +457,39 @@ public partial class MainWindow : Window
         SetCoherencyBusy(false);
     }
 
+    private void SetPercolationBusy(bool busy)
+    {
+        _percolationCalculationInProgress = busy;
+        CheckPercolationButton.IsEnabled = !busy;
+        if (busy)
+            StatsPercolationCount.Text = "Деревьев перколяции: идёт расчёт…";
+    }
+
+    private void CancelPercolationWork()
+    {
+        if (_percolationCts == null) return;
+        _percolationCts.Cancel();
+        _percolationCts.Dispose();
+        _percolationCts = null;
+        SetPercolationBusy(false);
+    }
+
+    private CancellationTokenSource BeginPercolationWork()
+    {
+        CancelPercolationWork();
+        _percolationCts = new CancellationTokenSource();
+        SetPercolationBusy(true);
+        return _percolationCts;
+    }
+
+    private void EndPercolationWork(CancellationTokenSource cts)
+    {
+        if (!ReferenceEquals(_percolationCts, cts)) return;
+        _percolationCts.Dispose();
+        _percolationCts = null;
+        SetPercolationBusy(false);
+    }
+
     private async void OnCheckCoherency(object sender, RoutedEventArgs e)
     {
         if (_currentLine == null)
@@ -509,7 +546,38 @@ public partial class MainWindow : Window
         RedrawCubes();
     }
 
-    private void OnCheckPercolation(object sender, RoutedEventArgs e)
+    private static (PermeabilityTreeList List, long ElapsedMs) RunPercolationWork(
+        CubeLine line,
+        CancellationToken token)
+    {
+        using var grid = line.GenerateGridFromLine();
+        if (grid.Count() == 0)
+            throw new InvalidOperationException("Сетка пуста");
+
+        double fullSideLength = grid[0][0][0].SideLength * grid.Count();
+        var sw = Stopwatch.StartNew();
+        var list = new PermeabilityTreeList(grid, fullSideLength, token);
+        sw.Stop();
+        return (list, sw.ElapsedMilliseconds);
+    }
+
+    private void ApplyPercolationResults()
+    {
+        StatsPercolationCount.Text = $"Деревьев перколяции: {_permeabilityTreeList!.TreeList.Count}";
+        PopulatePercolationTreeSelector();
+        ApplyPercolationView();
+        SetPercolationTabAvailable(_permeabilityTreeList.TreeList.Count > 0);
+    }
+
+    private long RecalculatePercolation()
+    {
+        var (list, elapsedMs) = RunPercolationWork(_currentLine!, CancellationToken.None);
+        _permeabilityTreeList = list;
+        ApplyPercolationResults();
+        return elapsedMs;
+    }
+
+    private async void OnCheckPercolation(object sender, RoutedEventArgs e)
     {
         if (_currentLine == null)
         {
@@ -517,31 +585,34 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (_percolationCalculationInProgress) return;
+
+        var line = _currentLine;
+        var cts = BeginPercolationWork();
+        var token = cts.Token;
+        var generation = _objectGeneration;
         try
         {
-            using var grid = _currentLine.GenerateGridFromLine();
-            if (grid.Count() == 0)
-            {
-                MessageBox.Show("Сетка пуста");
-                return;
-            }
+            var (list, elapsedMs) = await Task.Run(
+                () => RunPercolationWork(line, token),
+                token);
 
-            double fullSideLength = grid[0][0][0].SideLength * grid.Count();
+            if (generation != _objectGeneration) return;
 
-            var sw = Stopwatch.StartNew();
-            _permeabilityTreeList = new PermeabilityTreeList(grid, fullSideLength);
-            sw.Stop();
-
-            StatsPercolationCount.Text = $"Деревьев перколяции: {_permeabilityTreeList.TreeList.Count}";
-            StatsLastCalcTime.Text = $"Время последнего расчёта: {sw.ElapsedMilliseconds} мс";
-
-            PopulatePercolationTreeSelector();
-            ApplyPercolationView();
-            SetPercolationTabAvailable(_permeabilityTreeList.TreeList.Count > 0);
+            _permeabilityTreeList = list;
+            ApplyPercolationResults();
+            StatsLastCalcTime.Text = $"Время последнего расчёта: {elapsedMs} мс";
         }
-        catch (Exception ex)
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex) when (generation == _objectGeneration)
         {
             MessageBox.Show(ex.Message);
+        }
+        finally
+        {
+            EndPercolationWork(cts);
         }
     }
 
@@ -1174,6 +1245,7 @@ public partial class MainWindow : Window
 
         var line = _currentLine;
         bool preserveMaterial = PreserveMaterialCheckBox?.IsChecked == true;
+        bool hadPercolation = _permeabilityTreeList != null;
         var cts = BeginCoherencyWork();
         var token = cts.Token;
         var generation = _objectGeneration;
@@ -1201,6 +1273,13 @@ public partial class MainWindow : Window
             StatsCoherencyCount.Text = $"Связных компонент: {coherenceTreeList.Count}";
             StatsLastCalcTime.Text = $"Время последнего расчёта: {workResult.ElapsedMs} мс";
             RedrawCubes();
+
+            if (hadPercolation)
+            {
+                long percolationMs = RecalculatePercolation();
+                StatsLastCalcTime.Text =
+                    $"Время последнего расчёта: {workResult.ElapsedMs} мс (связность), {percolationMs} мс (перколяция)";
+            }
 
             if (workResult.LeavesShortage > 0)
             {

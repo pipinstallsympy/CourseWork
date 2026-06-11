@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using System.Threading;
 
 namespace CourseWorkZherbin;
 
@@ -6,10 +7,12 @@ public class PermeabilityTreeList
 {
     public List<PermeabilityTree> TreeList = new List<PermeabilityTree>();
 
-    public PermeabilityTreeList(CubeGrid grid, double fullSideLength)
+    public PermeabilityTreeList(
+        CubeGrid grid,
+        double fullSideLength,
+        CancellationToken cancellationToken = default)
     {
-        Coherency coherency = new Coherency();
-        List<TreeNode<Cube>> nodes = Coherency.CreateCt(grid, false);
+        List<TreeNode<Cube>> nodes = Coherency.CreateCt(grid, false, cancellationToken);
 
         int n = grid.Count();
         Cube c000 = grid[0][0][0];
@@ -24,6 +27,7 @@ public class PermeabilityTreeList
 
         foreach (TreeNode<Cube> node in nodes)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             PermeabilityTree tree = new PermeabilityTree(
                 node, 
                 minX, minY, minZ,

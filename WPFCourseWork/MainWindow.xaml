@@ -379,6 +379,7 @@
             </Button>
 
             <Button
+                x:Name="CheckPercolationButton"
                 Content = "Проверка на перколяцию"
                 Click = "OnCheckPercolation"
                 Margin="5" 

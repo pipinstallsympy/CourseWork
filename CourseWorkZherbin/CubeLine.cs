@@ -93,11 +93,6 @@ public class CubeLine : IDisposable
         int len = Line.Count;
         if (k <= 0) return;
 
-        if (k >= len)
-        {
-            SetAllPores();
-            return;
-        }
 
         int[] indices = ArrayPool<int>.Shared.Rent(len);
         try
@@ -136,11 +131,6 @@ public class CubeLine : IDisposable
             int j = Random.Shared.Next(i, len);
             (indices[i], indices[j]) = (indices[j], indices[i]);
         }
-    }
-
-    void SetAllPores()
-    {
-        foreach (Cube c in Line) c.IsEmpty = true;
     }
 
     public int PoreAmount()
