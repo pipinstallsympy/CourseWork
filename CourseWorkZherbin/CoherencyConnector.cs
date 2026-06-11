@@ -98,7 +98,8 @@ public class CoherencyConnector
     public List<ConnectionPath> ConnectAll(
         CubeGrid grid,
         List<TreeNode<Cube>> components,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IProgress<int>? clusterProcessed = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         int k = components.Count;
@@ -114,6 +115,8 @@ public class CoherencyConnector
                 ConnectionPath? p = ShortestConnection(grid, components[i], components[j], cancellationToken);
                 if (p != null) edges.Add(p);
             }
+
+            clusterProcessed?.Report(i + 1);
         }
         
         edges.Sort((a, b) =>  a.Distance.CompareTo(b.Distance));

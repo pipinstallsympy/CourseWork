@@ -3,6 +3,13 @@ using System.Threading;
 
 namespace CourseWorkZherbin;
 
+internal sealed class PoreProgressState
+{
+    public int TotalPores;
+    public int PoreClusterCount;
+    public int TotalSteps => TotalPores + Math.Max(PoreClusterCount, 1);
+}
+
 public class PermeabilityTreeList
 {
     public List<PermeabilityTree> TreeList = new List<PermeabilityTree>();
@@ -10,9 +17,25 @@ public class PermeabilityTreeList
     public PermeabilityTreeList(
         CubeGrid grid,
         double fullSideLength,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IProgress<(int current, int total)>? progress = null,
+        int totalPores = 0)
     {
-        List<TreeNode<Cube>> nodes = Coherency.CreateCt(grid, false, cancellationToken);
+        var poreProgressState = new PoreProgressState { TotalPores = totalPores };
+        IProgress<int>? poreVisited = progress != null && totalPores > 0
+            ? new ActionProgress(count => progress.Report((count, poreProgressState.TotalSteps)))
+            : null;
+
+        List<TreeNode<Cube>> nodes = Coherency.CreateCt(
+            grid,
+            false,
+            cancellationToken,
+            poreVisited: poreVisited);
+
+        poreProgressState.PoreClusterCount = nodes.Count;
+        int total = poreProgressState.TotalSteps;
+        if (progress != null && totalPores > 0)
+            progress.Report((totalPores, total));
 
         int n = grid.Count();
         Cube c000 = grid[0][0][0];
@@ -25,6 +48,7 @@ public class PermeabilityTreeList
         double maxY = cnnn.Y + halfSide;
         double maxZ = cnnn.Z + halfSide;
 
+        int treesBuilt = 0;
         foreach (TreeNode<Cube> node in nodes)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -35,6 +59,8 @@ public class PermeabilityTreeList
             if (tree.edgeNodes.Count > 1 && (tree.PartialPermeability.Count > 0 || tree.EndToEndPermeability.Count > 0))
                 TreeList.Add(tree);
 
+            treesBuilt++;
+            progress?.Report((totalPores + treesBuilt, total));
         }
 
         Console.WriteLine($"Created permeability forest. count: {TreeList.Count}");

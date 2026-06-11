@@ -58,7 +58,15 @@ public partial class MainWindow : Window
         ConnectComponents
     }
 
+    private enum CalculationProgressMode
+    {
+        None,
+        Clusters,
+        Pores
+    }
+
     private const int CoherencyPartitionWarningThreshold = 48;
+    private const int ProgressUiThrottleMs = 75;
     private CancellationTokenSource? _pipelineCts;
     private readonly Queue<CalculationJobType> _jobQueue = new();
     private CalculationJobType? _runningJob;
@@ -66,6 +74,10 @@ public partial class MainWindow : Window
     private bool _connectPreserveMaterial;
     private int _objectGeneration;
     private ExportColorTarget _activeExportColorTarget = ExportColorTarget.Material;
+    private CalculationProgressMode _calculationProgressMode = CalculationProgressMode.None;
+    private DateTime _lastProgressUiUpdate = DateTime.MinValue;
+    private int _lastReportedCurrent;
+    private int _lastReportedTotal;
 
     public MainWindow()
     {
@@ -89,7 +101,7 @@ public partial class MainWindow : Window
     private void ConfigureViewportChrome()
     {
         Viewport.ShowViewCube = false;
-        Viewport.ShowCoordinateSystem = true;
+        Viewport.ShowCoordinateSystem = false;
         Viewport.CoordinateSystemHorizontalPosition = 0.82;
         Viewport.CoordinateSystemVerticalPosition = -0.82;
         Viewport.CoordinateSystemSize = 120;
@@ -470,6 +482,7 @@ public partial class MainWindow : Window
         _pipelineProcessing = false;
         SetConnectBusy(false);
         SetPercolationBusy(false);
+        HideCalculationProgress();
     }
 
     private void EnsurePipelineStarted()
@@ -515,6 +528,56 @@ public partial class MainWindow : Window
         CheckPercolationButton.IsEnabled = !busy;
         if (busy)
             StatsPercolationCount.Text = "Деревьев перколяции: идёт расчёт…";
+    }
+
+    private void ShowCalculationProgress(CalculationProgressMode mode)
+    {
+        _calculationProgressMode = mode;
+        _lastProgressUiUpdate = DateTime.MinValue;
+        _lastReportedCurrent = 0;
+        _lastReportedTotal = 0;
+        CalculationProgressPanel.Visibility = Visibility.Visible;
+        CalculationProgressBar.Value = 0;
+        ApplyProgressText(0, 0);
+    }
+
+    private void UpdateCalculationProgress(int current, int total)
+    {
+        if (_calculationProgressMode == CalculationProgressMode.None) return;
+
+        var now = DateTime.UtcNow;
+        bool isComplete = total > 0 && current >= total;
+        bool throttleElapsed = (now - _lastProgressUiUpdate).TotalMilliseconds >= ProgressUiThrottleMs;
+        double previousPercent = _lastReportedTotal > 0
+            ? 100.0 * _lastReportedCurrent / _lastReportedTotal
+            : 0;
+        double nextPercent = total > 0 ? 100.0 * current / total : 0;
+
+        if (!isComplete && !throttleElapsed && Math.Abs(nextPercent - previousPercent) < 1 && current != 0)
+            return;
+
+        _lastProgressUiUpdate = now;
+        _lastReportedCurrent = current;
+        _lastReportedTotal = total;
+        ApplyProgressText(current, total);
+        CalculationProgressBar.Value = nextPercent;
+    }
+
+    private void ApplyProgressText(int current, int total)
+    {
+        string label = _calculationProgressMode == CalculationProgressMode.Clusters
+            ? "Обработано кластеров"
+            : "Обработано пор";
+        CalculationProgressText.Text = total > 0
+            ? $"{label} {current}/{total}"
+            : label;
+    }
+
+    private void HideCalculationProgress()
+    {
+        _calculationProgressMode = CalculationProgressMode.None;
+        CalculationProgressPanel.Visibility = Visibility.Collapsed;
+        CalculationProgressBar.Value = 0;
     }
 
     private async void ProcessPipelineAsync()
@@ -610,10 +673,13 @@ public partial class MainWindow : Window
 
             case CalculationJobType.Percolation:
                 SetPercolationBusy(true);
+                ShowCalculationProgress(CalculationProgressMode.Pores);
+                var percolationProgress = new Progress<(int current, int total)>(p =>
+                    UpdateCalculationProgress(p.current, p.total));
                 try
                 {
                     var (list, elapsedMs) = await Task.Run(
-                        () => RunPercolationWork(line, token),
+                        () => RunPercolationWork(line, token, percolationProgress),
                         token);
 
                     if (generation != _objectGeneration) return;
@@ -630,17 +696,23 @@ public partial class MainWindow : Window
                 finally
                 {
                     if (generation == _objectGeneration)
+                    {
+                        HideCalculationProgress();
                         SetPercolationBusy(false);
+                    }
                 }
 
                 break;
 
             case CalculationJobType.ConnectComponents:
                 SetConnectBusy(true);
+                ShowCalculationProgress(CalculationProgressMode.Clusters);
+                var clusterProgress = new Progress<(int current, int total)>(p =>
+                    UpdateCalculationProgress(p.current, p.total));
                 try
                 {
                     var workResult = await Task.Run(
-                        () => RunConnectComponentsWork(line, _connectPreserveMaterial, token),
+                        () => RunConnectComponentsWork(line, _connectPreserveMaterial, token, clusterProgress),
                         token);
 
                     if (generation != _objectGeneration) return;
@@ -672,10 +744,13 @@ public partial class MainWindow : Window
                     if (_permeabilityTreeList != null)
                     {
                         SetPercolationBusy(true);
+                        ShowCalculationProgress(CalculationProgressMode.Pores);
+                        var autoPercolationProgress = new Progress<(int current, int total)>(p =>
+                            UpdateCalculationProgress(p.current, p.total));
                         try
                         {
                             var (list, percolationMs) = await Task.Run(
-                                () => RunPercolationWork(line, token),
+                                () => RunPercolationWork(line, token, autoPercolationProgress),
                                 token);
 
                             if (generation != _objectGeneration) return;
@@ -700,7 +775,10 @@ public partial class MainWindow : Window
                 finally
                 {
                     if (generation == _objectGeneration)
+                    {
+                        HideCalculationProgress();
                         SetConnectBusy(false);
+                    }
                 }
 
                 break;
@@ -715,15 +793,17 @@ public partial class MainWindow : Window
 
     private static (PermeabilityTreeList List, long ElapsedMs) RunPercolationWork(
         CubeLine line,
-        CancellationToken token)
+        CancellationToken token,
+        IProgress<(int current, int total)>? progress = null)
     {
         using var grid = line.GenerateGridFromLine();
         if (grid.Count() == 0)
             throw new InvalidOperationException("Сетка пуста");
 
         double fullSideLength = grid[0][0][0].SideLength * grid.Count();
+        int totalPores = line.PoreAmount();
         var sw = Stopwatch.StartNew();
-        var list = new PermeabilityTreeList(grid, fullSideLength, token);
+        var list = new PermeabilityTreeList(grid, fullSideLength, token, progress, totalPores);
         sw.Stop();
         return (list, sw.ElapsedMilliseconds);
     }
@@ -1374,11 +1454,16 @@ public partial class MainWindow : Window
     private static ConnectComponentsWorkResult RunConnectComponentsWork(
         CubeLine line,
         bool preserveMaterial,
-        CancellationToken token)
+        CancellationToken token,
+        IProgress<(int current, int total)>? progress = null)
     {
         var sw = Stopwatch.StartNew();
         using var grid = line.GenerateGridFromLine();
-        var components = Coherency.CreateCt(grid, cancellationToken: token);
+        var clusterScope = new ClusterProgressScope(progress);
+        var components = Coherency.CreateCt(
+            grid,
+            cancellationToken: token,
+            clusterDiscovered: progress != null ? clusterScope.Phase1ClusterDiscovered : null);
 
         if (components.Count <= 1)
         {
@@ -1390,7 +1475,11 @@ public partial class MainWindow : Window
             };
         }
 
-        var bridges = new CoherencyConnector().ConnectAll(grid, components, token);
+        var bridges = new CoherencyConnector().ConnectAll(
+            grid,
+            components,
+            token,
+            clusterProcessed: progress != null ? clusterScope.Phase2ClusterProcessed : null);
 
         var distinctBridgeCubes = new HashSet<Cube>();
         foreach (var b in bridges)
@@ -1415,7 +1504,10 @@ public partial class MainWindow : Window
         }
 
         using var gridAfter = line.GenerateGridFromLine();
-        var trees = Coherency.CreateCt(gridAfter, cancellationToken: token);
+        var trees = Coherency.CreateCt(
+            gridAfter,
+            cancellationToken: token,
+            clusterDiscovered: progress != null ? clusterScope.Phase3ClusterDiscovered : null);
         var colorMap = BuildColorMap(trees);
         sw.Stop();
 

@@ -24,7 +24,7 @@
             <hx:Viewport3DX x:Name="Viewport"
                            CameraMode="Inspect"
                            ZoomExtentsWhenLoaded="False"
-                           ShowCoordinateSystem="True"
+                           ShowCoordinateSystem="False"
                            ShowViewCube="False"
                            CoordinateSystemHorizontalPosition="0.82"
                            CoordinateSystemVerticalPosition="-0.82"
@@ -365,13 +365,32 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
-            <Button Grid.Row="0"
+            <StackPanel x:Name="CalculationProgressPanel"
+                        Grid.Row="0"
+                        Grid.Column="0"
+                        Grid.ColumnSpan="2"
+                        Margin="5,0,5,8"
+                        Visibility="Collapsed">
+                <TextBlock x:Name="CalculationProgressText"
+                           FontSize="11"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,4"/>
+                <ProgressBar x:Name="CalculationProgressBar"
+                             Height="14"
+                             Minimum="0"
+                             Maximum="100"
+                             Value="0"
+                             Foreground="LimeGreen"/>
+            </StackPanel>
+
+            <Button Grid.Row="1"
                     Grid.Column="0"
                     Grid.ColumnSpan="2"
                     Content="Сгенерировать объект"
@@ -380,7 +399,7 @@
                     Height="30"
                     VerticalAlignment="Bottom"/>
 
-            <Button Grid.Row="1"
+            <Button Grid.Row="2"
                     Grid.Column="0"
                     x:Name="ConnectComponentsButton"
                     Content="Соединить компоненты"
@@ -389,7 +408,7 @@
                     Height="30"
                     VerticalAlignment="Bottom"/>
 
-            <Button Grid.Row="1"
+            <Button Grid.Row="2"
                     Grid.Column="1"
                     x:Name="CheckPercolationButton"
                     Content="Проверка на перколяцию"

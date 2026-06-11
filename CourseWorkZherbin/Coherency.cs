@@ -2,6 +2,47 @@ using System.Threading;
 
 namespace CourseWorkZherbin;
 
+internal sealed class ActionProgress : IProgress<int>
+{
+    private readonly Action<int> _handler;
+
+    public ActionProgress(Action<int> handler) => _handler = handler;
+
+    public void Report(int value) => _handler(value);
+}
+
+public sealed class ClusterProgressScope
+{
+    private readonly IProgress<(int current, int total)>? _progress;
+    private int _k;
+    private int _total;
+
+    public ClusterProgressScope(IProgress<(int current, int total)>? progress) => _progress = progress;
+
+    public IProgress<int> Phase1ClusterDiscovered => new ActionProgress(ReportPhase1Cluster);
+
+    public IProgress<int> Phase2ClusterProcessed => new ActionProgress(ReportPhase2Cluster);
+
+    public IProgress<int> Phase3ClusterDiscovered => new ActionProgress(ReportPhase3Cluster);
+
+    private void ReportPhase1Cluster(int count)
+    {
+        _k = count;
+        _total = 2 * _k + 1;
+        Report(count);
+    }
+
+    private void ReportPhase2Cluster(int processed) => Report(_k + processed);
+
+    private void ReportPhase3Cluster(int count)
+    {
+        _total = 2 * _k + count;
+        Report(2 * _k + count);
+    }
+
+    private void Report(int current) => _progress?.Report((current, Math.Max(current, _total)));
+}
+
 public class Coherency
 {
     private static readonly (int dx, int dy, int dz)[] directions =
@@ -17,12 +58,15 @@ public class Coherency
     public static List<TreeNode<Cube>> CreateCt(
         CubeGrid g,
         bool isMaterial = true,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IProgress<int>? clusterDiscovered = null,
+        IProgress<int>? poreVisited = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         int n = g.Count();
         bool[,,] visited = new bool[n, n, n];
         List<TreeNode<Cube>> nodes = new List<TreeNode<Cube>>();
+        int poresVisited = 0;
 
         for (int i = 0; i < n; i++)
         {
@@ -36,9 +80,26 @@ public class Coherency
                     if (visited[i, j, k]) continue;
 
                     visited[i, j, k] = true;
+                    if (!isMaterial)
+                        poreVisited?.Report(++poresVisited);
+
                     TreeNode<Cube> node = new TreeNode<Cube>(cube);
                     nodes.Add(node);
-                    IterativeCt(g, visited, isMaterial, n, node, i, j, k, cancellationToken);
+                    if (isMaterial)
+                        clusterDiscovered?.Report(nodes.Count);
+
+                    IterativeCt(
+                        g,
+                        visited,
+                        isMaterial,
+                        n,
+                        node,
+                        i,
+                        j,
+                        k,
+                        cancellationToken,
+                        poreVisited,
+                        ref poresVisited);
                 }
             }
         }
@@ -56,7 +117,9 @@ public class Coherency
         int rootX,
         int rootY,
         int rootZ,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IProgress<int>? poreVisited,
+        ref int poresVisited)
     {
         var stack = new Stack<(TreeNode<Cube> node, int x, int y, int z)>();
         var toPush = new List<(TreeNode<Cube> node, int x, int y, int z)>();
@@ -80,6 +143,9 @@ public class Coherency
                 if (!(c.IsEmpty ^ isMaterial)) continue;
                 if (visited[nx, ny, nz]) continue;
                 visited[nx, ny, nz] = true;
+
+                if (!isMaterial)
+                    poreVisited?.Report(++poresVisited);
 
                 TreeNode<Cube> newChild = new TreeNode<Cube>(c);
                 newChild.Parent = node;
