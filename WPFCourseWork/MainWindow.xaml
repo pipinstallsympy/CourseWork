@@ -235,6 +235,12 @@
                                  Checked="OnPercolationDisplayModeChanged"
                                  Unchecked="OnPercolationDisplayModeChanged"/>
 
+                    <CheckBox x:Name="ShowMaterialInPercolationCheckBox"
+                              Content="Включить просмотр материала"
+                              Margin="0,8,0,0"
+                              Checked="OnShowMaterialInPercolationChanged"
+                              Unchecked="OnShowMaterialInPercolationChanged"/>
+
                     <Rectangle Height="15"/>
 
                     <TextBlock x:Name="PercolationStatsPoreCount" Text="Кол-во пор: -"/>

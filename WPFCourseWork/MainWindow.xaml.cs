@@ -45,7 +45,6 @@ public partial class MainWindow : Window
     private Dictionary<Cube, MeshGeometryModel3D>? _boundaryPoreMeshes;
     private HashSet<Cube>? _cachedInnerPores;
     private bool _innerBatchReflectsSelection;
-    private LineGeometryModel3D? _percolationWireframe;
     private LineGeometryModel3D? _sampleBoundaryWireframe;
     private int _percolationSelectionUpdateVersion;
 
@@ -1256,6 +1255,12 @@ public partial class MainWindow : Window
             RedrawCubes();
     }
 
+    private void OnShowMaterialInPercolationChanged(object sender, RoutedEventArgs e)
+    {
+        if (!IsPercolationViewActive || _currentLine == null) return;
+        RedrawCubes();
+    }
+
     private HashSet<Cube>? GetVisiblePercolationPores()
     {
         if (ShowFullPercolationTreeRadio.IsChecked == true)
@@ -1318,13 +1323,6 @@ public partial class MainWindow : Window
 
     private void ClearPercolationScene()
     {
-        if (_percolationWireframe != null)
-        {
-            Viewport.Items.Remove(_percolationWireframe);
-            _dynamicSceneItems.Remove(_percolationWireframe);
-            _percolationWireframe = null;
-        }
-
         if (_sampleBoundaryWireframe != null)
         {
             Viewport.Items.Remove(_sampleBoundaryWireframe);
@@ -1362,6 +1360,15 @@ public partial class MainWindow : Window
         if (visiblePores == null) return;
 
         ClearPercolationScene();
+
+        if (ShowMaterialInPercolationCheckBox?.IsChecked == true)
+        {
+            foreach (var mesh in HelixSceneBuilder.BuildBatchedMaterialMeshes(
+                         _currentLine, useComponentColors: false, colorMap: null))
+            {
+                AddDynamicSceneItem(mesh);
+            }
+        }
 
         _sampleBoundaryWireframe = HelixSceneBuilder.BuildSampleBoundaryWireframe(_currentLine);
         if (_sampleBoundaryWireframe != null)
@@ -1779,89 +1786,5 @@ public partial class MainWindow : Window
         }
 
         return (Colors.LightGray, 1.0);
-    }
-
-    private void CollectOuterFaceEdges(
-        HashSet<(int, int, int, int, int, int)> set,
-        int i, int j, int k, int side)
-    {
-        bool nXm = IsMaterialNeighbor(i - 1, j, k, side);
-        bool nXp = IsMaterialNeighbor(i + 1, j, k, side);
-        bool nYm = IsMaterialNeighbor(i, j - 1, k, side);
-        bool nYp = IsMaterialNeighbor(i, j + 1, k, side);
-        bool nZm = IsMaterialNeighbor(i, j, k - 1, side);
-        bool nZp = IsMaterialNeighbor(i, j, k + 1, side);
-
-        int x0 = i, x1 = i + 1;
-        int y0 = j, y1 = j + 1;
-        int z0 = k, z1 = k + 1;
-
-        if (!nXm)
-        {
-            AddEdge(set, x0, y0, z0, x0, y1, z0);
-            AddEdge(set, x0, y1, z0, x0, y1, z1);
-            AddEdge(set, x0, y1, z1, x0, y0, z1);
-            AddEdge(set, x0, y0, z1, x0, y0, z0);
-        }
-        if (!nXp)
-        {
-            AddEdge(set, x1, y0, z0, x1, y1, z0);
-            AddEdge(set, x1, y1, z0, x1, y1, z1);
-            AddEdge(set, x1, y1, z1, x1, y0, z1);
-            AddEdge(set, x1, y0, z1, x1, y0, z0);
-        }
-        if (!nYm)
-        {
-            AddEdge(set, x0, y0, z0, x1, y0, z0);
-            AddEdge(set, x1, y0, z0, x1, y0, z1);
-            AddEdge(set, x1, y0, z1, x0, y0, z1);
-            AddEdge(set, x0, y0, z1, x0, y0, z0);
-        }
-        if (!nYp)
-        {
-            AddEdge(set, x0, y1, z0, x1, y1, z0);
-            AddEdge(set, x1, y1, z0, x1, y1, z1);
-            AddEdge(set, x1, y1, z1, x0, y1, z1);
-            AddEdge(set, x0, y1, z1, x0, y1, z0);
-        }
-        if (!nZm)
-        {
-            AddEdge(set, x0, y0, z0, x1, y0, z0);
-            AddEdge(set, x1, y0, z0, x1, y1, z0);
-            AddEdge(set, x1, y1, z0, x0, y1, z0);
-            AddEdge(set, x0, y1, z0, x0, y0, z0);
-        }
-        if (!nZp)
-        {
-            AddEdge(set, x0, y0, z1, x1, y0, z1);
-            AddEdge(set, x1, y0, z1, x1, y1, z1);
-            AddEdge(set, x1, y1, z1, x0, y1, z1);
-            AddEdge(set, x0, y1, z1, x0, y0, z1);
-        }
-    }
-
-    private bool IsMaterialNeighbor(int i, int j, int k, int side)
-    {
-        if (i < 0 || j < 0 || k < 0) return false;
-        if (i >= side || j >= side || k >= side) return false;
-        int idx = i * side * side + j * side + k;
-        return !_currentLine![idx].IsEmpty;
-    }
-
-    private static void AddEdge(
-        HashSet<(int, int, int, int, int, int)> set,
-        int x1, int y1, int z1,
-        int x2, int y2, int z2)
-    {
-        bool firstSmaller =
-            x1 < x2 || (x1 == x2 && (y1 < y2 || (y1 == y2 && z1 <= z2)));
-        if (firstSmaller)
-        {
-            set.Add((x1, y1, z1, x2, y2, z2));
-        }
-        else
-        {
-            set.Add((x2, y2, z2, x1, y1, z1));
-        }
     }
 }
