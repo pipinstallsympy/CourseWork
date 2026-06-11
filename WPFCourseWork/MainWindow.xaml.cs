@@ -41,10 +41,12 @@ public partial class MainWindow : Window
     private int _selectedPercolationTreeIndex = -1;
     private bool _updatingPercolationSelector;
     private bool _percolationTabAvailable;
-    private Dictionary<Cube, MeshGeometryModel3D>? _poreMeshByCube;
+    private MeshGeometryModel3D? _innerPoreBatch;
+    private Dictionary<Cube, MeshGeometryModel3D>? _boundaryPoreMeshes;
+    private HashSet<Cube>? _cachedInnerPores;
+    private bool _innerBatchReflectsSelection;
     private LineGeometryModel3D? _percolationWireframe;
     private LineGeometryModel3D? _sampleBoundaryWireframe;
-    private readonly List<Element3D> _percolationConnectionLines = new();
     private int _percolationSelectionUpdateVersion;
 
     private bool IsPercolationViewActive =>
@@ -1276,7 +1278,7 @@ public partial class MainWindow : Window
     {
         if (!IsPercolationViewActive) return;
         var visiblePores = GetVisiblePercolationPores();
-        if (visiblePores == null) return;
+        if (visiblePores == null || _percolationEdgePores == null) return;
 
         var pt = e.GetPosition(Viewport);
         var hits = Viewport.FindHits(pt);
@@ -1284,6 +1286,7 @@ public partial class MainWindow : Window
         {
             if (hit.ModelHit is MeshGeometryModel3D { Tag: Cube cube })
             {
+                if (!_percolationEdgePores.Contains(cube)) continue;
                 if (!visiblePores.Contains(cube)) continue;
                 if (!ReferenceEquals(_selectedBoundaryPore, cube))
                 {
@@ -1308,19 +1311,9 @@ public partial class MainWindow : Window
         Dispatcher.BeginInvoke(() =>
         {
             if (version != _percolationSelectionUpdateVersion) return;
-            if (!IsPercolationViewActive || _poreMeshByCube == null) return;
+            if (!IsPercolationViewActive || _boundaryPoreMeshes == null) return;
             UpdatePercolationSelection();
         }, DispatcherPriority.Render);
-    }
-
-    private void ClearPercolationConnectionLines()
-    {
-        foreach (var line in _percolationConnectionLines)
-        {
-            Viewport.Items.Remove(line);
-            _dynamicSceneItems.Remove(line);
-        }
-        _percolationConnectionLines.Clear();
     }
 
     private void ClearPercolationScene()
@@ -1339,23 +1332,31 @@ public partial class MainWindow : Window
             _sampleBoundaryWireframe = null;
         }
 
-        if (_poreMeshByCube != null)
+        if (_innerPoreBatch != null)
         {
-            foreach (var mesh in _poreMeshByCube.Values)
+            Viewport.Items.Remove(_innerPoreBatch);
+            _dynamicSceneItems.Remove(_innerPoreBatch);
+            _innerPoreBatch = null;
+        }
+
+        if (_boundaryPoreMeshes != null)
+        {
+            foreach (var mesh in _boundaryPoreMeshes.Values)
             {
                 Viewport.Items.Remove(mesh);
                 _dynamicSceneItems.Remove(mesh);
             }
-            _poreMeshByCube = null;
+            _boundaryPoreMeshes = null;
         }
 
-        ClearPercolationConnectionLines();
+        _cachedInnerPores = null;
+        _innerBatchReflectsSelection = false;
         _percolationSelectionUpdateVersion++;
     }
 
     private void RebuildPercolationScene()
     {
-        if (_currentLine == null) return;
+        if (_currentLine == null || _percolationEdgePores == null) return;
 
         var visiblePores = GetVisiblePercolationPores();
         if (visiblePores == null) return;
@@ -1366,37 +1367,104 @@ public partial class MainWindow : Window
         if (_sampleBoundaryWireframe != null)
             AddDynamicSceneItem(_sampleBoundaryWireframe);
 
-      
+        SplitPoreLayers(visiblePores, _percolationEdgePores, out var innerPores, out var boundaryPores);
 
-        _poreMeshByCube = new Dictionary<Cube, MeshGeometryModel3D>();
+        _cachedInnerPores = innerPores.Count > 0 ? new HashSet<Cube>(innerPores) : null;
+        RebuildInnerPoreBatch(innerPores);
+        RebuildBoundaryPoreMeshes(boundaryPores);
+
+        BringOriginAxesToFront();
+    }
+
+    private static void SplitPoreLayers(
+        HashSet<Cube> visiblePores,
+        HashSet<Cube> edgePores,
+        out List<Cube> innerPores,
+        out List<Cube> boundaryPores)
+    {
+        innerPores = new List<Cube>();
+        boundaryPores = new List<Cube>();
         foreach (var cube in visiblePores)
+        {
+            if (edgePores.Contains(cube))
+                boundaryPores.Add(cube);
+            else
+                innerPores.Add(cube);
+        }
+    }
+
+    private Color GetInnerPoreColor() =>
+        _selectedBoundaryPore == null ? Colors.DarkSeaGreen : Colors.LightGray;
+
+    private void RebuildInnerPoreBatch(IEnumerable<Cube> innerPores)
+    {
+        if (_innerPoreBatch != null)
+        {
+            Viewport.Items.Remove(_innerPoreBatch);
+            _dynamicSceneItems.Remove(_innerPoreBatch);
+            _innerPoreBatch = null;
+        }
+
+        var poreList = innerPores as IList<Cube> ?? innerPores.ToList();
+        if (poreList.Count == 0)
+        {
+            _innerBatchReflectsSelection = false;
+            return;
+        }
+
+        var color = GetInnerPoreColor();
+        _innerPoreBatch = HelixSceneBuilder.BuildBatchedPoreMesh(poreList, color, 1.0);
+        if (_innerPoreBatch != null)
+            AddDynamicSceneItem(_innerPoreBatch);
+
+        _innerBatchReflectsSelection = _selectedBoundaryPore != null;
+    }
+
+    private void RebuildBoundaryPoreMeshes(IEnumerable<Cube> boundaryPores)
+    {
+        if (_boundaryPoreMeshes != null)
+        {
+            foreach (var mesh in _boundaryPoreMeshes.Values)
+            {
+                Viewport.Items.Remove(mesh);
+                _dynamicSceneItems.Remove(mesh);
+            }
+        }
+
+        _boundaryPoreMeshes = new Dictionary<Cube, MeshGeometryModel3D>();
+        foreach (var cube in boundaryPores)
         {
             (Color color, double opacity) = ResolveBoundaryPoreAppearance(cube);
             var mesh = HelixSceneBuilder.BuildPoreMesh(cube, color, opacity);
-            _poreMeshByCube[cube] = mesh;
+            _boundaryPoreMeshes[cube] = mesh;
             AddDynamicSceneItem(mesh);
         }
+    }
 
-        AddPercolationConnectionLines();
-        BringOriginAxesToFront();
+    private void UpdateBoundaryPoreAppearances()
+    {
+        if (_boundaryPoreMeshes == null) return;
+
+        foreach (var (cube, mesh) in _boundaryPoreMeshes)
+        {
+            (Color color, double opacity) = ResolveBoundaryPoreAppearance(cube);
+            HelixSceneBuilder.ApplyPoreAppearance(mesh, color, opacity);
+        }
     }
 
     private void UpdatePercolationSelection()
     {
-        if (_poreMeshByCube == null) return;
+        if (_boundaryPoreMeshes == null) return;
 
-        var visiblePores = GetVisiblePercolationPores();
-        if (visiblePores == null) return;
-
-        foreach (var cube in visiblePores)
+        bool hasSelection = _selectedBoundaryPore != null;
+        if (_cachedInnerPores != null
+            && _cachedInnerPores.Count > 0
+            && _innerBatchReflectsSelection != hasSelection)
         {
-            if (!_poreMeshByCube.TryGetValue(cube, out var mesh)) continue;
-            (Color color, double opacity) = ResolveBoundaryPoreAppearance(cube);
-            HelixSceneBuilder.ApplyPoreAppearance(mesh, color, opacity);
+            RebuildInnerPoreBatch(_cachedInnerPores);
         }
 
-        ClearPercolationConnectionLines();
-        AddPercolationConnectionLines();
+        UpdateBoundaryPoreAppearances();
     }
 
     private static (Dictionary<Cube, HashSet<Cube>> partialPeers,
@@ -1681,42 +1749,6 @@ public partial class MainWindow : Window
         }
 
         BringOriginAxesToFront();
-    }
-
-    private void AddPercolationConnectionLines()
-    {
-        if (_selectedBoundaryPore == null) return;
-
-        var endToEndPairs = new List<(Cube from, Cube to)>();
-        var partialPairs = new List<(Cube from, Cube to)>();
-
-        if (_endToEndPeersByCube != null
-            && _endToEndPeersByCube.TryGetValue(_selectedBoundaryPore, out var endToEndPeers))
-        {
-            foreach (var peer in endToEndPeers)
-                endToEndPairs.Add((_selectedBoundaryPore, peer));
-        }
-
-        if (_partialPeersByCube != null
-            && _partialPeersByCube.TryGetValue(_selectedBoundaryPore, out var partialPeers))
-        {
-            foreach (var peer in partialPeers)
-                partialPairs.Add((_selectedBoundaryPore, peer));
-        }
-
-        var endToEndLines = HelixSceneBuilder.BuildConnectionLines(endToEndPairs, Colors.DodgerBlue);
-        if (endToEndLines != null)
-            AddPercolationConnectionLine(endToEndLines);
-
-        var partialLines = HelixSceneBuilder.BuildConnectionLines(partialPairs, Colors.Gold);
-        if (partialLines != null)
-            AddPercolationConnectionLine(partialLines);
-    }
-
-    private void AddPercolationConnectionLine(Element3D line)
-    {
-        AddDynamicSceneItem(line);
-        _percolationConnectionLines.Add(line);
     }
 
     private (Color color, double opacity) ResolveBoundaryPoreAppearance(Cube cube)

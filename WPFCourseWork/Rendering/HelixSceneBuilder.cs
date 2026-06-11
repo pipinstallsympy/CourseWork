@@ -217,32 +217,25 @@ public static class HelixSceneBuilder
         };
     }
 
-    public static LineGeometryModel3D? BuildConnectionLines(
-        IEnumerable<(Cube from, Cube to)> pairs,
+    public static MeshGeometryModel3D? BuildBatchedPoreMesh(
+        IEnumerable<Cube> cubes,
         WpfColor color,
-        double thickness = 2.0)
+        double opacity)
     {
-        var pairList = pairs as IList<(Cube from, Cube to)> ?? pairs.ToList();
-        if (pairList.Count == 0) return null;
+        var builder = new MeshBuilder();
+        foreach (var cube in cubes)
+            AddCubeToBuilder(builder, cube);
 
-        var positions = new Vector3Collection(pairList.Count * 2);
-        foreach (var (from, to) in pairList)
-        {
-            positions.Add(new Vector3(
-                (float)from.CentralPoint.X,
-                (float)from.CentralPoint.Y,
-                (float)from.CentralPoint.Z));
-            positions.Add(new Vector3(
-                (float)to.CentralPoint.X,
-                (float)to.CentralPoint.Y,
-                (float)to.CentralPoint.Z));
-        }
+        var geometry = builder.ToMesh();
+        if (geometry == null || geometry.Positions == null || geometry.Positions.Count == 0)
+            return null;
 
-        return new LineGeometryModel3D
+        bool transparent = opacity < 1.0;
+        return new MeshGeometryModel3D
         {
-            Geometry = CreateLineGeometry(positions),
-            Color = color,
-            Thickness = thickness,
+            Geometry = geometry,
+            Material = GetOrCreateMaterial(color, opacity),
+            IsTransparent = transparent,
             IsHitTestVisible = false
         };
     }

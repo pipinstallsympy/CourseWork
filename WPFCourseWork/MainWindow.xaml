@@ -242,7 +242,7 @@
                     <TextBlock x:Name="PercolationStatsEndToEnd" Text="Пар сквозной перколяции: -" Margin="0,4,0,0"/>
                     <TextBlock x:Name="PercolationStatsPartial" Text="Пар частичной перколяции: -" Margin="0,4,0,0"/>
                     <TextBlock x:Name="PercolationStatsHasThrough" Text="Сквозная перколяция: -" Margin="0,4,0,0"/>
-                    <TextBlock x:Name="PercolationStatsTreeDepth" Text="Глубина октодерева: -" Margin="0,4,0,0"/>
+                    <TextBlock x:Name="PercolationStatsTreeDepth" Text="Глубина дерева: -" Margin="0,4,0,0"/>
                 </StackPanel>
                 </ScrollViewer>
             </TabItem>
