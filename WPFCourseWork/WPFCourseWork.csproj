@@ -18,4 +18,10 @@
       <PackageReference Include="HelixToolkit.Wpf.SharpDX" Version="2.27.3" />
     </ItemGroup>
 
+    <ItemGroup>
+      <Resource Include="Resources\cube.ico" />
+      <Resource Include="Resources\bridge.ico" />
+      <Resource Include="Resources\navigation.ico" />
+    </ItemGroup>
+
 </Project>
