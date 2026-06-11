@@ -7,6 +7,16 @@
         xmlns:controls="clr-namespace:WPFCourseWork.Controls"
         mc:Ignorable="d"
         Title="Course Work Zherbin" Height="540" Width="960" WindowStyle="ThreeDBorderWindow">
+    <Window.Resources>
+        <Style x:Key="IconActionButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="52"/>
+            <Setter Property="Height" Value="52"/>
+            <Setter Property="Padding" Value="6"/>
+            <Setter Property="Margin" Value="5"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+    </Window.Resources>
     <Grid Name="MainRoot" Background="White">
         
         <Grid.ColumnDefinitions>
@@ -365,17 +375,10 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
 
             <StackPanel x:Name="CalculationProgressPanel"
                         Grid.Row="0"
-                        Grid.Column="0"
-                        Grid.ColumnSpan="2"
                         Margin="5,0,5,8"
                         Visibility="Collapsed">
                 <TextBlock x:Name="CalculationProgressText"
@@ -390,32 +393,31 @@
                              Foreground="LimeGreen"/>
             </StackPanel>
 
-            <Button Grid.Row="1"
-                    Grid.Column="0"
-                    Grid.ColumnSpan="2"
-                    Content="Сгенерировать объект"
-                    Click="OnMethodSelected"
-                    Margin="5"
-                    Height="30"
-                    VerticalAlignment="Bottom"/>
+            <UniformGrid Grid.Row="1"
+                         Columns="3"
+                         Rows="1">
+                <Button Style="{StaticResource IconActionButtonStyle}"
+                        ToolTip="Генерация объекта"
+                        Click="OnMethodSelected">
+                    <Image Source="/Resources/cube.ico" Stretch="Uniform"/>
+                </Button>
 
-            <Button Grid.Row="2"
-                    Grid.Column="0"
-                    x:Name="ConnectComponentsButton"
-                    Content="Соединить компоненты"
-                    Click="OnConnectComponents"
-                    Margin="5"
-                    Height="30"
-                    VerticalAlignment="Bottom"/>
+                <Button x:Name="ConnectComponentsButton"
+                        Style="{StaticResource IconActionButtonStyle}"
+                        ToolTip="Восстановление связности"
+                        IsEnabled="False"
+                        Click="OnConnectComponents">
+                    <Image Source="/Resources/bridge.ico" Stretch="Uniform"/>
+                </Button>
 
-            <Button Grid.Row="2"
-                    Grid.Column="1"
-                    x:Name="CheckPercolationButton"
-                    Content="Проверка на перколяцию"
-                    Click="OnCheckPercolation"
-                    Margin="5"
-                    Height="30"
-                    VerticalAlignment="Bottom"/>
+                <Button x:Name="CheckPercolationButton"
+                        Style="{StaticResource IconActionButtonStyle}"
+                        ToolTip="Проверка на перколяцию"
+                        IsEnabled="False"
+                        Click="OnCheckPercolation">
+                    <Image Source="/Resources/navigation.ico" Stretch="Uniform"/>
+                </Button>
+            </UniformGrid>
         </Grid>
     </Grid>
 </Window>

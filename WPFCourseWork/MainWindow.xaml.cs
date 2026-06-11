@@ -71,6 +71,8 @@ public partial class MainWindow : Window
     private readonly Queue<CalculationJobType> _jobQueue = new();
     private CalculationJobType? _runningJob;
     private bool _pipelineProcessing;
+    private bool _connectBusy;
+    private bool _percolationBusy;
     private bool _connectPreserveMaterial;
     private int _objectGeneration;
     private ExportColorTarget _activeExportColorTarget = ExportColorTarget.Material;
@@ -96,6 +98,7 @@ public partial class MainWindow : Window
         ExportModeHintText.Text = ExportWithColorCheckBox.IsChecked == true
             ? "Сохраняются только воксели материала с выбранным цветом (файл MTL создаётся рядом)."
             : "Сохраняются только воксели материала (без пор).";
+        UpdateActionButtonsState();
     }
 
     private void ConfigureViewportChrome()
@@ -449,6 +452,7 @@ public partial class MainWindow : Window
         StatsPercolationCount.Text = "Деревьев перколяции: -";
         SetPercolationTabAvailable(false);
         FrameCameraToLine(liney);
+        UpdateActionButtonsState();
 
         if (liney != null)
             StartPipelineWithCoherencyCheck();
@@ -516,16 +520,25 @@ public partial class MainWindow : Window
             StatsCoherencyCount.Text = "Связных компонент: идёт расчёт…";
     }
 
+    private void UpdateActionButtonsState()
+    {
+        bool hasObject = _currentLine != null;
+        ConnectComponentsButton.IsEnabled = hasObject && !_connectBusy;
+        CheckPercolationButton.IsEnabled = hasObject && !_percolationBusy;
+    }
+
     private void SetConnectBusy(bool busy)
     {
-        ConnectComponentsButton.IsEnabled = !busy;
+        _connectBusy = busy;
+        UpdateActionButtonsState();
         if (busy)
             StatsCoherencyCount.Text = "Связных компонент: идёт соединение…";
     }
 
     private void SetPercolationBusy(bool busy)
     {
-        CheckPercolationButton.IsEnabled = !busy;
+        _percolationBusy = busy;
+        UpdateActionButtonsState();
         if (busy)
             StatsPercolationCount.Text = "Деревьев перколяции: идёт расчёт…";
     }
