@@ -1220,7 +1220,7 @@ public partial class MainWindow : Window
         PercolationStatsHasThrough.Text = tree.HasEndToEndPercolation
             ? "Сквозная перколяция: да"
             : "Сквозная перколяция: нет";
-        PercolationStatsTreeDepth.Text = $"Глубина октодерева: {tree.TreeDepth}";
+        PercolationStatsTreeDepth.Text = $"Глубина дерева: {tree.TreeDepth}";
     }
 
     private void ApplyPercolationView()

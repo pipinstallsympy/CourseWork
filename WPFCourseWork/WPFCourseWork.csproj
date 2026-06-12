@@ -8,6 +8,7 @@
         <UseWPF>true</UseWPF>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <DebugType>none</DebugType>
+        <ApplicationIcon>Resources\icon.ico</ApplicationIcon>
     </PropertyGroup>
 
     <ItemGroup>
