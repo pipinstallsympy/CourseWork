@@ -41,7 +41,7 @@ public partial class MainWindow : Window
     private int _selectedPercolationTreeIndex = -1;
     private bool _updatingPercolationSelector;
     private bool _percolationTabAvailable;
-    private MeshGeometryModel3D? _innerPoreBatch;
+    private InstancingMeshGeometryModel3D? _innerPoreBatch;
     private Dictionary<Cube, MeshGeometryModel3D>? _boundaryPoreMeshes;
     private HashSet<Cube>? _cachedInnerPores;
     private bool _innerBatchReflectsSelection;
@@ -1363,7 +1363,7 @@ public partial class MainWindow : Window
 
         if (ShowMaterialInPercolationCheckBox?.IsChecked == true)
         {
-            foreach (var mesh in HelixSceneBuilder.BuildBatchedMaterialMeshes(
+            foreach (var mesh in HelixSceneBuilder.BuildInstancedMaterialMeshes(
                          _currentLine, useComponentColors: false, colorMap: null))
             {
                 AddDynamicSceneItem(mesh);
@@ -1420,7 +1420,7 @@ public partial class MainWindow : Window
         }
 
         var color = GetInnerPoreColor();
-        _innerPoreBatch = HelixSceneBuilder.BuildBatchedPoreMesh(poreList, color, 1.0);
+        _innerPoreBatch = HelixSceneBuilder.BuildInstancedPoreMesh(_currentLine!, poreList, color, 1.0);
         if (_innerPoreBatch != null)
             AddDynamicSceneItem(_innerPoreBatch);
 
@@ -1749,7 +1749,7 @@ public partial class MainWindow : Window
                                   && _cubeColorMap != null
                                   && _cubeColorMap.Count > 0;
 
-        foreach (var mesh in HelixSceneBuilder.BuildBatchedMaterialMeshes(
+        foreach (var mesh in HelixSceneBuilder.BuildInstancedMaterialMeshes(
                      _currentLine, useComponentColors, _cubeColorMap))
         {
             AddDynamicSceneItem(mesh);

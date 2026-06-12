@@ -5,6 +5,8 @@ using HelixToolkit.Wpf.SharpDX;
 using SharpDX;
 using WpfColor = System.Windows.Media.Color;
 using Color4 = SharpDX.Color4;
+using Matrix = SharpDX.Matrix;
+using MeshGeometry3D = HelixToolkit.Wpf.SharpDX.MeshGeometry3D;
 using PerspectiveCamera = HelixToolkit.Wpf.SharpDX.PerspectiveCamera;
 
 namespace WPFCourseWork.Rendering;
@@ -15,6 +17,13 @@ public static class HelixSceneBuilder
     private const double DefaultGridSpacing = 1.0;
 
     private static readonly Dictionary<WpfColor, PhongMaterial> MaterialCache = new();
+
+    private static readonly Lazy<MeshGeometry3D> UnitCubeGeometry = new(() =>
+    {
+        var builder = new MeshBuilder();
+        builder.AddBox(Vector3.Zero, 1, 1, 1);
+        return builder.ToMesh();
+    });
 
     /// <summary>
     /// Coordinate grid in the Z–X plane (normal along Y), visible from application start.
@@ -95,17 +104,24 @@ public static class HelixSceneBuilder
         ];
     }
 
-    public static IReadOnlyList<Element3D> BuildBatchedMaterialMeshes(
+    public static IReadOnlyList<Element3D> BuildInstancedMaterialMeshes(
         CubeLine line,
         bool useComponentColors,
         Dictionary<Cube, WpfColor>? colorMap)
     {
-        var builders = new Dictionary<WpfColor, MeshBuilder>();
+        var instancesByColor = new Dictionary<WpfColor, List<Matrix>>();
+        int n = VoxelSurface.GetPartition(line);
 
-        for (int idx = 0; idx < line.Count(); idx++)
+        for (int i = 0; i < n; i++)
+        for (int j = 0; j < n; j++)
+        for (int k = 0; k < n; k++)
         {
-            var cube = line[idx];
-            if (cube.IsEmpty) continue;
+            if (!VoxelSurface.IsExposedMaterialVoxel(line, n, i, j, k))
+            {
+                continue;
+            }
+
+            var cube = line[VoxelSurface.ToIndex(n, i, j, k)];
 
             WpfColor color = WpfColor.FromRgb(0xCC, 0x22, 0x22);
             if (useComponentColors && colorMap != null && colorMap.TryGetValue(cube, out var mapped))
@@ -113,24 +129,24 @@ public static class HelixSceneBuilder
                 color = mapped;
             }
 
-            if (!builders.TryGetValue(color, out var builder))
+            if (!instancesByColor.TryGetValue(color, out var instances))
             {
-                builder = new MeshBuilder();
-                builders[color] = builder;
+                instances = new List<Matrix>();
+                instancesByColor[color] = instances;
             }
 
-            AddCubeToBuilder(builder, cube);
+            instances.Add(CubeToInstanceMatrix(cube));
         }
 
-        var result = new List<Element3D>(builders.Count);
-        foreach (var (color, builder) in builders)
+        var result = new List<Element3D>(instancesByColor.Count);
+        foreach (var (color, instances) in instancesByColor)
         {
-            var mesh = builder.ToMesh();
-            if (mesh == null || mesh.Positions == null || mesh.Positions.Count == 0) continue;
+            if (instances.Count == 0) continue;
 
-            result.Add(new MeshGeometryModel3D
+            result.Add(new InstancingMeshGeometryModel3D
             {
-                Geometry = mesh,
+                Geometry = UnitCubeGeometry.Value,
+                Instances = instances,
                 Material = GetOrCreateMaterial(color, 1.0),
                 IsHitTestVisible = false
             });
@@ -217,23 +233,64 @@ public static class HelixSceneBuilder
         };
     }
 
-    public static MeshGeometryModel3D? BuildBatchedPoreMesh(
+    public static InstancingMeshGeometryModel3D? BuildInstancedPoreMesh(
         IEnumerable<Cube> cubes,
         WpfColor color,
         double opacity)
     {
-        var builder = new MeshBuilder();
+        var instances = new List<Matrix>();
         foreach (var cube in cubes)
-            AddCubeToBuilder(builder, cube);
+            instances.Add(CubeToInstanceMatrix(cube));
 
-        var geometry = builder.ToMesh();
-        if (geometry == null || geometry.Positions == null || geometry.Positions.Count == 0)
+        return CreateInstancedPoreMesh(instances, color, opacity);
+    }
+
+    public static InstancingMeshGeometryModel3D? BuildInstancedPoreMesh(
+        CubeLine line,
+        IEnumerable<Cube> cubes,
+        WpfColor color,
+        double opacity)
+    {
+        var poreSet = cubes as HashSet<Cube> ?? cubes.ToHashSet();
+        if (poreSet.Count == 0)
+        {
             return null;
+        }
+
+        var instances = new List<Matrix>();
+        int n = VoxelSurface.GetPartition(line);
+
+        for (int i = 0; i < n; i++)
+        for (int j = 0; j < n; j++)
+        for (int k = 0; k < n; k++)
+        {
+            var cube = line[VoxelSurface.ToIndex(n, i, j, k)];
+            if (!cube.IsEmpty || !poreSet.Contains(cube) || !VoxelSurface.IsExposedPoreVoxel(line, n, i, j, k))
+            {
+                continue;
+            }
+
+            instances.Add(CubeToInstanceMatrix(cube));
+        }
+
+        return CreateInstancedPoreMesh(instances, color, opacity);
+    }
+
+    private static InstancingMeshGeometryModel3D? CreateInstancedPoreMesh(
+        List<Matrix> instances,
+        WpfColor color,
+        double opacity)
+    {
+        if (instances.Count == 0)
+        {
+            return null;
+        }
 
         bool transparent = opacity < 1.0;
-        return new MeshGeometryModel3D
+        return new InstancingMeshGeometryModel3D
         {
-            Geometry = geometry,
+            Geometry = UnitCubeGeometry.Value,
+            Instances = instances,
             Material = GetOrCreateMaterial(color, opacity),
             IsTransparent = transparent,
             IsHitTestVisible = false
@@ -352,6 +409,16 @@ public static class HelixSceneBuilder
             Positions = positions,
             Indices = indices
         };
+    }
+
+    private static Matrix CubeToInstanceMatrix(Cube cube)
+    {
+        float side = (float)cube.SideLength;
+        return Matrix.Scaling(side)
+            * Matrix.Translation(
+                (float)cube.CentralPoint.X,
+                (float)cube.CentralPoint.Y,
+                (float)cube.CentralPoint.Z);
     }
 
     private static void AddCubeToBuilder(MeshBuilder builder, Cube cube)
